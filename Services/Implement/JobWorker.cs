@@ -17,7 +17,7 @@ using DocumentFormat.OpenXml.Wordprocessing;
 using Services.Dtos;
 
 
-namespace Services.Service
+namespace Services.Implement
 {
     public class JobWorker : BackgroundService, IJobWorker
     {

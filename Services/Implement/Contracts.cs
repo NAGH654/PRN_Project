@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
-namespace Services.Service
+namespace Services.Implement
 {
     public interface IUploadFile
     {

@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Services.Service;
+using Services.Implement;
 namespace API.Adapters
 {
     public sealed class FormFileUpload : IUploadFile

@@ -3,23 +3,15 @@ using Repositories.Data;
 using Repositories.Entities;
 using Services.Interfaces;
 using Services.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Services.Service
+namespace Services.Implement
 {
-    public class AssignmentService : IAssignmentService
+    public class AssignmentService(AppDbContext db) : IAssignmentService
     {
-        private readonly AppDbContext _db;
-        public AssignmentService(AppDbContext db) => _db = db;
-
         public async Task<AssignmentDto> CreateAsync(AssignmentCreateDto dto, CancellationToken ct = default)
         {
             // kiểm tra duy nhất (ClassId + Code)
-            var exists = await _db.Assignments.AnyAsync(a => a.ClassId == dto.ClassId && a.Code == dto.Code, ct);
+            var exists = await db.Assignments.AnyAsync(a => a.ClassId == dto.ClassId && a.Code == dto.Code, ct);
             if (exists) throw new InvalidOperationException("Assignment code already exists in this class.");
 
             var entity = new Assignment
@@ -32,21 +24,21 @@ namespace Services.Service
                 RubricJson = dto.RubricJson,
                 DueAt = dto.DueAt
             };
-            _db.Assignments.Add(entity);
-            await _db.SaveChangesAsync(ct);
+            db.Assignments.Add(entity);
+            await db.SaveChangesAsync(ct);
 
             return ToDto(entity);
         }
 
         public async Task<AssignmentDto?> GetAsync(Guid id, CancellationToken ct = default)
         {
-            var e = await _db.Assignments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            var e = await db.Assignments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
             return e is null ? null : ToDto(e);
         }
 
         public async Task<IReadOnlyList<AssignmentDto>> ListAsync(CancellationToken ct = default)
         {
-            return await _db.Assignments.AsNoTracking()
+            return await db.Assignments.AsNoTracking()
                 .Select(a => new AssignmentDto
                 {
                     Id = a.Id,
@@ -62,7 +54,7 @@ namespace Services.Service
 
         public async Task<bool> UpdateAsync(Guid id, AssignmentUpdateDto dto, CancellationToken ct = default)
         {
-            var e = await _db.Assignments.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var e = await db.Assignments.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (e is null) return false;
 
             if (dto.Name is not null) e.Name = dto.Name;
@@ -71,16 +63,16 @@ namespace Services.Service
             if (dto.RubricJson is not null) e.RubricJson = dto.RubricJson;
             if (dto.DueAt.HasValue) e.DueAt = dto.DueAt;
 
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
             return true;
         }
 
         public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
         {
-            var e = await _db.Assignments.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var e = await db.Assignments.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (e is null) return false;
-            _db.Assignments.Remove(e);
-            await _db.SaveChangesAsync(ct);
+            db.Assignments.Remove(e);
+            await db.SaveChangesAsync(ct);
             return true;
         }
 
