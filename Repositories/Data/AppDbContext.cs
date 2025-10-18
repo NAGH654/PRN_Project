@@ -1,17 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Repositories.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Repositories.Data
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext(DbContextOptions<AppDbContext> opt) : DbContext(opt)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> opt) : base(opt) { }
-
         public DbSet<User> Users => Set<User>();
         public DbSet<Student> Students => Set<Student>();
         public DbSet<Course> Courses => Set<Course>();
