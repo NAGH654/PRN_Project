@@ -1,20 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Services.Service;
 
 namespace API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/scores")]
     [ApiController]
-    public class ScoresController : ControllerBase
+    public class ScoresController(IExportService export) : ControllerBase
     {
-        private readonly IExportService _export;
-        public ScoresController(IExportService export) { _export = export; }
-
         [HttpGet("export")]
         public async Task<IActionResult> Export([FromQuery] Guid assignmentId)
         {
-            var bytes = await _export.ExportScoresExcelAsync(assignmentId);
+            var bytes = await export.ExportScoresExcelAsync(assignmentId);
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "scores.xlsx");
         }
     }
