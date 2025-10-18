@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
+using Repositories.Interfaces;
 
 namespace Repositories.Entities
 {
-    public class Assignment
+    public class Assignment : IEntity
     {
         [Key] public Guid Id { get; set; }
         public Guid ClassId { get; set; }

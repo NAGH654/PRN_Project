@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 using Repositories.Entities.Enum;
-using static System.Formats.Asn1.AsnWriter;
+using Repositories.Interfaces;
 
 namespace Repositories.Entities
 {
-    public class Submission
+    public class Submission : IEntity
     {
         [Key] public Guid Id { get; set; }
         public Guid AssignmentId { get; set; }

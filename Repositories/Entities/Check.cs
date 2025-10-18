@@ -1,14 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using Repositories.Interfaces;
 
 namespace Repositories.Entities
 {
-    public class Check
+    public class Check : IEntity
     {
         [Key] public Guid Id { get; set; }
         public Guid SubmissionId { get; set; }
