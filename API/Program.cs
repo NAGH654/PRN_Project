@@ -1,16 +1,27 @@
-﻿using API.Utils;
+﻿using API.Middlewares;
+using API.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddServices(builder.Configuration);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add<ValidationFilter>();
+        options.ReturnHttpNotAcceptable = true;
+    })
+    .AddXmlSerializerFormatters()
+    .ConfigureApiBehaviorOptions(options => options.SuppressModelStateInvalidFilter = true);
+    
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerConfiguration();
 builder.Services.AddJWTAuthenticationScheme(builder.Configuration);
 
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionHandler>();
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Repositories.Data.AppDbContext>();
