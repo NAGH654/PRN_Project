@@ -2,7 +2,6 @@
 using Repositories.Data;
 using Repositories.Entities.Enum;
 using Repositories.Entities;
-using Services.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Services.Dtos;
 
 
 namespace Services.Service

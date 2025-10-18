@@ -361,3 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+##########################
+# Custom Project Settings
+##########################
+
+# Storage folders - ignore new uploaded/generated files
+# (already tracked files will remain)
+API/storage/uploads/*
+API/storage/jobs/*
+!API/storage/uploads/.gitkeep
+!API/storage/jobs/.gitkeep

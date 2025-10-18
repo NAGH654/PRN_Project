@@ -1,5 +1,6 @@
 ﻿using API.Adapters;
-using API.Request;
+using Services.Dtos.Requests;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Services.Service;
 

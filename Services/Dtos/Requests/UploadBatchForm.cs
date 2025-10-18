@@ -1,4 +1,6 @@
-﻿namespace API.Request
+﻿using Microsoft.AspNetCore.Http;
+
+namespace Services.Dtos.Requests
 {
     public class UploadBatchForm
     {
