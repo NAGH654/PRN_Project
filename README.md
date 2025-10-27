@@ -105,6 +105,8 @@ This use case breakdown provides clear, actionable tasks that your team can disc
 
 Below is a detailed breakdown of each entity in the database design, explaining its purpose, relationships, business flows/use cases it supports, and the specific assignment requirements it addresses.
 
+![Entity Relationship Diagram](PRN232_Assignment_Grading_System_ERD.png)
+
 ### 1. **Users**
 **Meaning:** Represents system users with different roles (Admin, Manager, Moderator, Examiner) who interact with the platform.
 
