@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Repositories.Entities;
+using Repositories.Entities.Enums;
 
 namespace Repositories.Data
 {
@@ -16,7 +17,7 @@ namespace Repositories.Data
 					Username = "admin",
 					Email = "admin@swd392.test",
 					PasswordHash = "",
-					Role = "Admin",
+					Role = UserRole.Admin,
 					IsActive = true
 				};
 
@@ -25,7 +26,7 @@ namespace Repositories.Data
 					Username = "lecturer",
 					Email = "lecturer@swd392.test",
 					PasswordHash = "",
-					Role = "Examiner",
+					Role = UserRole.Examiner,
 					IsActive = true
 				};
 

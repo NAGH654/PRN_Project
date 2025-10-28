@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Repositories.Entities.Enums;
 
 namespace Repositories.Entities
 {
@@ -9,7 +10,7 @@ namespace Repositories.Entities
 		public string Username { get; set; } = string.Empty;
 		public string Email { get; set; } = string.Empty;
 		public string PasswordHash { get; set; } = string.Empty;
-		public string Role { get; set; } = string.Empty; // Admin, Manager, Moderator, Examiner
+		public UserRole Role { get; set; }
 		public bool IsActive { get; set; }
 		public DateTime CreatedAt { get; set; }
 		public DateTime UpdatedAt { get; set; }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Repositories.Entities;
+using Repositories.Entities.Enums;
 
 namespace Repositories.Data
 {
@@ -104,7 +105,7 @@ namespace Repositories.Data
 				e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
 				e.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
 				e.Property(x => x.ContentHash).HasMaxLength(128);
-				e.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("Pending");
+				e.Property(x => x.Status).HasDefaultValue(SubmissionStatus.Pending);
 				e.Property(x => x.SubmissionTime).HasDefaultValueSql("getutcdate()");
 				e.ToTable(t => t.HasCheckConstraint("CK_Submissions_Status", "[Status] IN ('Pending','Processing','Graded','Flagged')"));
 				e.HasOne(x => x.Session).WithMany(x => x.Submissions).HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
@@ -117,7 +118,7 @@ namespace Repositories.Data
 				e.Property(x => x.ViolationId).HasDefaultValueSql("newsequentialid()");
 				e.Property(x => x.ViolationType).HasMaxLength(50).IsRequired();
 				e.Property(x => x.Description).HasMaxLength(500).IsRequired();
-				e.Property(x => x.Severity).HasMaxLength(20).HasDefaultValue("Warning");
+				e.Property(x => x.Severity).HasDefaultValue(ViolationSeverity.Warning);
 				e.Property(x => x.DetectedAt).HasDefaultValueSql("getutcdate()");
 				e.ToTable(t => t.HasCheckConstraint("CK_Violations_Severity", "[Severity] IN ('Warning','Error')"));
 				e.HasOne(x => x.Submission).WithMany(x => x.Violations).HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Cascade);

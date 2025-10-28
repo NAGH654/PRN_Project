@@ -1,4 +1,5 @@
 using System;
+using Repositories.Entities.Enums;
 
 namespace Repositories.Entities
 {
@@ -6,9 +7,9 @@ namespace Repositories.Entities
 	{
 		public Guid ViolationId { get; set; }
 		public Guid SubmissionId { get; set; }
-		public string ViolationType { get; set; } = string.Empty; // Naming, Duplicate, Content
+		public ViolationType ViolationType { get; set; }
 		public string Description { get; set; } = string.Empty;
-		public string Severity { get; set; } = "Warning"; // Warning, Error
+		public ViolationSeverity Severity { get; set; } = ViolationSeverity.Warning;
 		public DateTime DetectedAt { get; set; }
 
 		public Submission? Submission { get; set; }

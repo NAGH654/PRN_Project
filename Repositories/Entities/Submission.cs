@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Repositories.Entities.Enums;
 
 namespace Repositories.Entities
 {
@@ -14,7 +15,7 @@ namespace Repositories.Entities
 		public long? FileSize { get; set; }
 		public string? ContentHash { get; set; }
 		public DateTime SubmissionTime { get; set; }
-		public string Status { get; set; } = "Pending"; // Pending, Processing, Graded, Flagged
+		public SubmissionStatus Status { get; set; } = SubmissionStatus.Pending;
 
 		public ExamSession? Session { get; set; }
 		public ICollection<Violation> Violations { get; set; } = new List<Violation>();
