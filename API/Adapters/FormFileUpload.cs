@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Services.Implement;
 namespace API.Adapters
 {
-    public sealed class FormFileUpload : IUploadFile
+    // kept for future use; no interface dependency now
+    public sealed class FormFileUpload
     {
         private readonly IFormFile _inner;
         public FormFileUpload(IFormFile inner) => _inner = inner;

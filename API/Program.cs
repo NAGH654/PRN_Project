@@ -1,5 +1,6 @@
 ﻿using API.Middlewares;
 using API.Utils;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +26,8 @@ app.UseMiddleware<GlobalExceptionHandler>();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Repositories.Data.AppDbContext>();
-    await Repositories.Data.AppDbSeeder.SeedAsync(db);
+    await db.Database.MigrateAsync();
+    await Repositories.Data.DbSeeder.SeedDefaultsAsync(db);
 }
 
 // Configure the HTTP request pipeline.

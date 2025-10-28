@@ -455,7 +455,7 @@ This command will:
 Once the containers are running:
 - **API**: http://localhost:5000
 - **Swagger UI**: http://localhost:5000/swagger
-- **SQL Server**: localhost:1433
+- **SQL Server**: localhost:14330
   - Username: `sa`
   - Password: `YourStrong@Passw0rd`
 
@@ -590,7 +590,7 @@ docker-compose exec api dotnet ef database update --project /src/Repositories
 ### Connect to SQL Server from Host
 
 Use any SQL client (SSMS, Azure Data Studio, etc.):
-- Server: `localhost,1433`
+- Server: `localhost,14330`
 - Username: `sa`
 - Password: `YourStrong@Passw0rd`
 - Database: `Swd392`
