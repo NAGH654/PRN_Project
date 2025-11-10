@@ -51,7 +51,7 @@ I'll break down each use case with concrete, step-by-step flows that your team c
 - Cannot modify exam after first submission is uploaded
 
 ### **Use Case 2: Submission Upload & Processing**
-**Goal:** Extract and validate student submissions from RAR files, detect violations.
+**Goal:** Extract and validate student submissions from RAR/ZIP files, detect violations.
 
 **Primary Actor:** System (automated) or Examiner (manual upload)
 
@@ -59,13 +59,13 @@ I'll break down each use case with concrete, step-by-step flows that your team c
 
 **Preconditions:**
 - Exam session is active (current time within session start/end)
-- RAR file contains student submissions
+- RAR/ZIP file contains student submissions
 - File size < 500MB
 
 **Main Success Scenario:**
-1. Examiner uploads RAR file via WPF client or web interface
-2. System validates file format (.rar extension)
-3. System extracts RAR contents to temporary directory
+1. Examiner uploads RAR/ZIP file via WPF client or web interface
+2. System validates file format (.rar/.zip extension)
+3. System extracts RAR/ZIP contents to temporary directory
 4. For each extracted file:
    - Parses filename for student ID (e.g., "SE123456_Exam1.docx")
    - Validates naming convention against pattern "StudentID_ExamName.ext"
@@ -83,7 +83,7 @@ I'll break down each use case with concrete, step-by-step flows that your team c
 10. System sends SignalR notification to relevant managers/examiners
 
 **Alternative Flows:**
-- **Corrupt RAR:** Show error "File is corrupted or password protected"
+- **Corrupt RAR/ZIP:** Show error "File is corrupted or password protected"
 - **Invalid Naming:** Create violation record with type "Naming"
 - **Large File:** If >100MB, process asynchronously and show progress bar
 - **No Images:** Skip image extraction step
@@ -96,7 +96,7 @@ I'll break down each use case with concrete, step-by-step flows that your team c
 
 **Business Rules:**
 - Student ID must match pattern: 2 letters + 6 digits (e.g., SE123456)
-- Maximum 1000 submissions per RAR file
+- Maximum 1000 submissions per RAR/ZIP file
 - Duplicate detection only within same exam session
 - Images stored as separate files with naming convention "submissionId_imageIndex.ext"
 

@@ -10,6 +10,11 @@ namespace Repositories.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Drop check constraints that reference the columns before altering types
+            migrationBuilder.Sql(@"IF OBJECT_ID('CK_Violations_Severity','C') IS NOT NULL ALTER TABLE [Violations] DROP CONSTRAINT [CK_Violations_Severity];");
+            migrationBuilder.Sql(@"IF OBJECT_ID('CK_Submissions_Status','C') IS NOT NULL ALTER TABLE [Submissions] DROP CONSTRAINT [CK_Submissions_Status];");
+            migrationBuilder.Sql(@"IF OBJECT_ID('CK_Users_Role','C') IS NOT NULL ALTER TABLE [Users] DROP CONSTRAINT [CK_Users_Role];");
+
             migrationBuilder.AlterColumn<int>(
                 name: "ViolationType",
                 table: "Violations",
@@ -51,6 +56,11 @@ namespace Repositories.Migrations
                 oldType: "nvarchar(20)",
                 oldMaxLength: 20,
                 oldDefaultValue: "Pending");
+
+            // Recreate check constraints with enum textual values no longer applicable; use int ranges if needed
+            migrationBuilder.Sql(@"ALTER TABLE [Violations] ADD CONSTRAINT [CK_Violations_Severity] CHECK ([Severity] IN (1,2));");
+            migrationBuilder.Sql(@"ALTER TABLE [Submissions] ADD CONSTRAINT [CK_Submissions_Status] CHECK ([Status] IN (1,2,3,4));");
+            migrationBuilder.Sql(@"ALTER TABLE [Users] ADD CONSTRAINT [CK_Users_Role] CHECK ([Role] IN (1,2,3,4));");
         }
 
         /// <inheritdoc />

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using static Microsoft.AspNetCore.Http.StatusCodes;
 using static Services.Dtos.Responses.ValidationErrorResponse;
 
@@ -14,7 +15,8 @@ namespace API.Middlewares
             catch (Exception ex)
             {
                 //Log original exceptions/File, Debugger, Console
-                logger.LogError("An exception occurred: {ExceptionMessage}", ex.Message);
+                logger.LogError(ex, "An exception occurred: {ExceptionMessage}. StackTrace: {StackTrace}", 
+                    ex.Message, ex.StackTrace);
 
                 switch (ex)
                 {
@@ -23,11 +25,24 @@ namespace API.Middlewares
                         await HandleExceptionAsync(
                             context, Status408RequestTimeout, "Request time out!!!Please try again");
                         break;
-                    default:
+                    case InvalidOperationException invalidOp:
+                        // Show more details for InvalidOperationException (like 7-Zip not found, file issues)
+                        var errorMsg = context.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment()
+                            ? invalidOp.Message
+                            : "Invalid operation. Please check your input and try again.";
                         await HandleExceptionAsync(
                             context,
                             Status500InternalServerError,
-                            "Sorry, internal server error occurred. Kindly try again later");
+                            errorMsg);
+                        break;
+                    default:
+                        var defaultMsg = context.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment()
+                            ? ex.Message
+                            : "Sorry, internal server error occurred. Kindly try again later";
+                        await HandleExceptionAsync(
+                            context,
+                            Status500InternalServerError,
+                            defaultMsg);
                         break;
                 }
             }
