@@ -1,4 +1,6 @@
 using Services.Dtos;
+using Services.Interfaces;
+using Services.Implement;
 using Repositories.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +18,11 @@ namespace API.Utils
             services.AddDatabase(config);
             
             services.Configure<StorageOptions>(config.GetSection("Storage"));
+
+            services.AddScoped<ISubmissionProcessingService, SubmissionProcessingService>();
+            services.AddScoped<ISessionQueryService, SessionQueryService>();
+            services.AddScoped<IReportService, ReportService>();
+            services.AddScoped<ISubmissionQueryService, SubmissionQueryService>();
 
             return services;
         }
