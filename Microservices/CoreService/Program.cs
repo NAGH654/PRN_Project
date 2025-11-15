@@ -33,11 +33,13 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<IExamRepository, ExamRepository>();
 builder.Services.AddScoped<IGradeRepository, GradeRepository>();
+builder.Services.AddScoped<IExamSessionRepository, ExamSessionRepository>();
 
 // Services
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IGradeService, GradeService>();
+builder.Services.AddScoped<IExamSessionService, ExamSessionService>();
 
 // Health checks
 builder.Services.AddHealthChecks()
