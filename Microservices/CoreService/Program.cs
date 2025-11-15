@@ -40,6 +40,7 @@ builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IGradeService, GradeService>();
 builder.Services.AddScoped<IExamSessionService, ExamSessionService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 // Health checks
 builder.Services.AddHealthChecks()

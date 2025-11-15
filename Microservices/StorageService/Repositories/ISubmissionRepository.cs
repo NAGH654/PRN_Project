@@ -7,6 +7,7 @@ public interface ISubmissionRepository
     Task<Submission?> GetByIdAsync(Guid id);
     Task<IEnumerable<Submission>> GetByStudentIdAsync(Guid studentId);
     Task<IEnumerable<Submission>> GetByExamIdAsync(Guid examId);
+    Task<IEnumerable<Submission>> GetBySessionIdAsync(Guid sessionId);
     Task<Submission?> GetByStudentAndExamAsync(Guid studentId, Guid examId);
     Task<IEnumerable<Submission>> GetByStatusAsync(string status);
     Task<Submission> CreateAsync(Submission submission);

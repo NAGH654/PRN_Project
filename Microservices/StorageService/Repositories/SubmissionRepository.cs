@@ -41,6 +41,16 @@ public class SubmissionRepository : ISubmissionRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<Submission>> GetBySessionIdAsync(Guid sessionId)
+    {
+        return await _context.Submissions
+            .Include(s => s.Files)
+            .Include(s => s.Violations)
+            .Where(s => s.ExamSessionId == sessionId)
+            .OrderByDescending(s => s.SubmittedAt)
+            .ToListAsync();
+    }
+
     public async Task<Submission?> GetByStudentAndExamAsync(Guid studentId, Guid examId)
     {
         return await _context.Submissions

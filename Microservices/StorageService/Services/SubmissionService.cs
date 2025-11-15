@@ -31,6 +31,11 @@ public class SubmissionService : ISubmissionService
         return await _submissionRepository.GetByExamIdAsync(examId);
     }
 
+    public async Task<IEnumerable<Submission>> GetBySessionIdAsync(Guid sessionId)
+    {
+        return await _submissionRepository.GetBySessionIdAsync(sessionId);
+    }
+
     public async Task<Submission> CreateSubmissionAsync(Guid studentId, Guid examId, Guid examSessionId)
     {
         // Check if student already has a submission for this exam

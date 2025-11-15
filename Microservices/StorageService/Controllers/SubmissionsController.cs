@@ -8,11 +8,16 @@ namespace StorageService.Controllers;
 public class SubmissionsController : ControllerBase
 {
     private readonly ISubmissionService _submissionService;
+    private readonly ITextExtractionService _textExtractionService;
     private readonly ILogger<SubmissionsController> _logger;
 
-    public SubmissionsController(ISubmissionService submissionService, ILogger<SubmissionsController> logger)
+    public SubmissionsController(
+        ISubmissionService submissionService,
+        ITextExtractionService textExtractionService,
+        ILogger<SubmissionsController> logger)
     {
         _submissionService = submissionService;
+        _textExtractionService = textExtractionService;
         _logger = logger;
     }
 
@@ -134,6 +139,39 @@ public class SubmissionsController : ControllerBase
         {
             _logger.LogError(ex, "Error deleting submission {Id}", id);
             return StatusCode(500, new { message = "An error occurred while deleting the submission" });
+        }
+    }
+
+    [HttpGet("{id:guid}/text")]
+    public async Task<IActionResult> GetSubmissionText(Guid id)
+    {
+        try
+        {
+            var result = await _textExtractionService.GetSubmissionTextAsync(id);
+            if (result == null)
+                return NotFound(new { message = $"Submission with ID {id} not found" });
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error extracting text from submission {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while extracting text" });
+        }
+    }
+
+    [HttpGet("by-session/{sessionId:guid}")]
+    public async Task<IActionResult> GetBySession(Guid sessionId)
+    {
+        try
+        {
+            var submissions = await _submissionService.GetBySessionIdAsync(sessionId);
+            return Ok(submissions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting submissions for session {SessionId}", sessionId);
+            return StatusCode(500, new { message = "An error occurred while retrieving submissions" });
         }
     }
 
