@@ -26,6 +26,40 @@ services:
       start_period: 10s
 
   # ========================================
+  # API GATEWAY - Single Entry Point
+  # ========================================
+  gateway:
+    build:
+      context: .
+      dockerfile: Microservices/Gateway/Dockerfile
+    container_name: api_gateway
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Jwt__SecretKey=YourSuperSecretKeyForJwtTokenGeneration123456
+      - Jwt__Issuer=AssignmentGradingSystem
+      - Jwt__Audience=AssignmentGradingUsers
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+      storage-service:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
   # MONOLITH API (Legacy - Optional)
   # ========================================
   # Uncomment if you want to run monolith alongside microservices
@@ -56,8 +90,6 @@ services:
       context: .
       dockerfile: Microservices/IdentityService/Dockerfile
     container_name: identity_service
-    ports:
-      - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -85,8 +117,6 @@ services:
       context: .
       dockerfile: Microservices/CoreService/Dockerfile
     container_name: core_service
-    ports:
-      - "5002:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -112,32 +142,38 @@ services:
   # ========================================
   # MICROSERVICE 3: Storage Service (File Processing)
   # ========================================
-  # Uncomment when StorageService is ready
-  # storage-service:
-  #   build:
-  #     context: .
-  #     dockerfile: Microservices/StorageService/Dockerfile
-  #   container_name: storage_service
-  #   ports:
-  #     - "5003:80"
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - ASPNETCORE_URLS=http://+:80
-  #     - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
-  #     - Authentication__Key=ThisIsAVerySecureKeyForJWTAuthenticationWithAtLeast32Characters!
-  #     - Authentication__Issuer=AssignmentGradingAPI
-  #     - Authentication__Audience=AssignmentGradingUsers
-  #     - Services__IdentityService=http://identity-service:80
-  #     - Services__CoreService=http://core-service:80
-  #   depends_on:
-  #     assignment_grading_db:
-  #       condition: service_healthy
-  #     identity-service:
-  #       condition: service_healthy
-  #   networks:
-  #     - app-network
-  #   volumes:
-  #     - storage_files:/app/storage
+  storage-service:
+    build:
+      context: .
+      dockerfile: Microservices/StorageService/Dockerfile
+    container_name: storage_service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Jwt__SecretKey=YourSuperSecretKeyForJwtTokenGeneration123456
+      - Jwt__Issuer=AssignmentGradingSystem
+      - Jwt__Audience=AssignmentGradingUsers
+      - Services__IdentityService=http://identity-service:80
+      - Services__CoreService=http://core-service:80
+      - Storage__Path=/app/storage
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - storage_files:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/submissions/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   sqlserver_data:

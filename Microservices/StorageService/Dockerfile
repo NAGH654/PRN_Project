@@ -12,22 +12,22 @@ WORKDIR /src
 COPY ["Microservices/Shared/Shared.csproj", "Microservices/Shared/"]
 RUN dotnet restore "Microservices/Shared/Shared.csproj"
 
-# Copy CoreService project
-COPY ["Microservices/CoreService/CoreService.csproj", "Microservices/CoreService/"]
-RUN dotnet restore "Microservices/CoreService/CoreService.csproj"
+# Copy StorageService project
+COPY ["Microservices/StorageService/StorageService.csproj", "Microservices/StorageService/"]
+RUN dotnet restore "Microservices/StorageService/StorageService.csproj"
 
 # Copy all source files
 COPY Microservices/Shared/ Microservices/Shared/
-COPY Microservices/CoreService/ Microservices/CoreService/
+COPY Microservices/StorageService/ Microservices/StorageService/
 
 # Build
-WORKDIR "/src/Microservices/CoreService"
-RUN dotnet build "CoreService.csproj" -c Release -o /app/build
+WORKDIR "/src/Microservices/StorageService"
+RUN dotnet build "StorageService.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "CoreService.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "StorageService.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "CoreService.dll"]
+ENTRYPOINT ["dotnet", "StorageService.dll"]
