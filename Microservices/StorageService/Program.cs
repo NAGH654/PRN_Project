@@ -36,6 +36,10 @@ builder.Services.AddScoped<IFileRepository, FileRepository>();
 // Services
 builder.Services.AddScoped<ISubmissionService, SubmissionService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<INestedZipService, NestedZipService>();
+
+// Configuration
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 // Health checks
 builder.Services.AddHealthChecks()
