@@ -38,6 +38,7 @@ namespace IdentityService.Data
                     .IsRequired();
                 
                 entity.Property(e => e.Role)
+                    .HasConversion<string>()
                     .HasMaxLength(20)
                     .IsRequired();
                 

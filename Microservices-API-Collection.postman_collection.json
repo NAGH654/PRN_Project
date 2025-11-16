@@ -1,0 +1,844 @@
+{
+	"info": {
+		"name": "Microservices Assignment Grading API",
+		"description": "Complete API collection for testing all microservices endpoints through the Gateway",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"role\": \"Admin\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"token\", jsonData.token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Test123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"your-refresh-token\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "refresh"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Subjects",
+			"item": [
+				{
+					"name": "Get All Subjects",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/subjects",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "subjects"]
+						}
+					}
+				},
+				{
+					"name": "Get Subject By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/subjects/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "subjects", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Subject",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"CS101\",\n  \"name\": \"Computer Science\",\n  \"description\": \"Introduction to Computer Science\",\n  \"credits\": 3\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/subjects",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "subjects"]
+						}
+					}
+				},
+				{
+					"name": "Update Subject",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"CS101\",\n  \"name\": \"Computer Science Updated\",\n  \"description\": \"Advanced Computer Science\",\n  \"credits\": 4\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/subjects/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "subjects", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Subject",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/subjects/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "subjects", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Exams",
+			"item": [
+				{
+					"name": "Get All Exams",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams"]
+						}
+					}
+				},
+				{
+					"name": "Get Exam By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Exam",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Midterm Exam\",\n  \"description\": \"CS101 Midterm\",\n  \"subjectId\": \"00000000-0000-0000-0000-000000000001\",\n  \"semesterId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examDate\": \"2025-12-01T09:00:00Z\",\n  \"durationMinutes\": 120,\n  \"totalMarks\": 100\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams"]
+						}
+					}
+				},
+				{
+					"name": "Update Exam",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Final Exam\",\n  \"description\": \"CS101 Final\",\n  \"subjectId\": \"00000000-0000-0000-0000-000000000001\",\n  \"semesterId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examDate\": \"2025-12-15T09:00:00Z\",\n  \"durationMinutes\": 180,\n  \"totalMarks\": 100\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Exam",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Grades",
+			"item": [
+				{
+					"name": "Get All Grades",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/grades",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades"]
+						}
+					}
+				},
+				{
+					"name": "Get Grade By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/grades/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Grades By Student",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/grades/student/:studentId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades", "student", ":studentId"],
+							"variable": [
+								{
+									"key": "studentId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Grades By Exam",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/grades/exam/:examId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades", "exam", ":examId"],
+							"variable": [
+								{
+									"key": "examId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Grade",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"score\": 85.5,\n  \"feedback\": \"Good work\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/grades",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades"]
+						}
+					}
+				},
+				{
+					"name": "Update Grade",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"score\": 90.0,\n  \"feedback\": \"Excellent work\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/grades/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Grade",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/grades/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "grades", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Sessions",
+			"item": [
+				{
+					"name": "Get All Sessions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions"]
+						}
+					}
+				},
+				{
+					"name": "Get Active Sessions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions/active",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions", "active"]
+						}
+					}
+				},
+				{
+					"name": "Get Session By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Sessions By Exam",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions/by-exam/:examId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions", "by-exam", ":examId"],
+							"variable": [
+								{
+									"key": "examId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Session",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"sessionName\": \"Morning Session\",\n  \"scheduledDate\": \"2025-12-01T09:00:00Z\",\n  \"location\": \"Room 101\",\n  \"maxStudents\": 50,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions"]
+						}
+					}
+				},
+				{
+					"name": "Update Session",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"sessionName\": \"Afternoon Session\",\n  \"scheduledDate\": \"2025-12-01T14:00:00Z\",\n  \"location\": \"Room 102\",\n  \"maxStudents\": 60,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Session",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/sessions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "sessions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Submissions",
+			"item": [
+				{
+					"name": "Get Submission By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Submissions By Student",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/by-student/:studentId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", "by-student", ":studentId"],
+							"variable": [
+								{
+									"key": "studentId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Submissions By Exam",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/by-exam/:examId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", "by-exam", ":examId"],
+							"variable": [
+								{
+									"key": "examId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Submissions By Session",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/by-session/:sessionId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", "by-session", ":sessionId"],
+							"variable": [
+								{
+									"key": "sessionId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Submission Text",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/:id/text",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", ":id", "text"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Submission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examSessionId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions"]
+						}
+					}
+				},
+				{
+					"name": "Update Submission Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"Completed\",\n  \"notes\": \"Processing finished successfully\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/:id/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", ":id", "status"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Submission",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "File Upload",
+			"item": [
+				{
+					"name": "Upload Nested ZIP",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "SessionId",
+									"value": "00000000-0000-0000-0000-000000000001",
+									"type": "text"
+								},
+								{
+									"key": "Archive",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/nestedzip/upload",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "nestedzip", "upload"]
+						},
+						"description": "Upload a nested ZIP archive for processing. Archive can be up to 600MB."
+					}
+				},
+				{
+					"name": "Get File",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/files/:path",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "files", ":path"],
+							"variable": [
+								{
+									"key": "path",
+									"value": "uploads/file.docx"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"item": [
+				{
+					"name": "Get Exam Reports",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reports/exams?subjectId=&fromDate=&toDate=",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "reports", "exams"],
+							"query": [
+								{
+									"key": "subjectId",
+									"value": ""
+								},
+								{
+									"key": "fromDate",
+									"value": ""
+								},
+								{
+									"key": "toDate",
+									"value": ""
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Health Checks",
+			"item": [
+				{
+					"name": "Gateway Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "Submissions Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/submissions/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "submissions", "health"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
