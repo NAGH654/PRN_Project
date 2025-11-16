@@ -13,7 +13,7 @@ services:
       - SA_PASSWORD=YourStrong@Passw0rd
       - MSSQL_PID=Developer
     ports:
-      - "1433:1433"
+      - "1434:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     networks:
@@ -90,6 +90,9 @@ services:
       context: .
       dockerfile: Microservices/IdentityService/Dockerfile
     container_name: identity_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -117,6 +120,9 @@ services:
       context: .
       dockerfile: Microservices/CoreService/Dockerfile
     container_name: core_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5002:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -147,6 +153,9 @@ services:
       context: .
       dockerfile: Microservices/StorageService/Dockerfile
     container_name: storage_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5003:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
