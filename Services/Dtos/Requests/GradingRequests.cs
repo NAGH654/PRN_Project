@@ -30,8 +30,8 @@ namespace Services.Dtos.Requests
     }
     public class UpdateGradeRequest
     {
-        [Required]
-        public Guid GradeId { get; set; }
+        //[Required]
+        //public Guid GradeId { get; set; }
 
         [Required]
         [Range(0, double.MaxValue)]

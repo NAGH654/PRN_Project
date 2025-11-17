@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Services.Dtos.Requests;
 using Services.Dtos.Responses;
@@ -107,7 +107,6 @@ namespace API.Controllers
         [HttpPost("submissions/grade")]
         public async Task<IActionResult> SubmitGrades([FromBody] GradingRequests request, CancellationToken ct)
         {
-            // Get examiner ID from JWT token claims
             var examinerId = Guid.Empty;
             if (User.Identity?.IsAuthenticated == true)
             {
@@ -133,14 +132,14 @@ namespace API.Controllers
         [HttpPut("grades/{gradeId:guid}")]
         public async Task<IActionResult> UpdateGrade([FromRoute] Guid gradeId, [FromBody] UpdateGradeRequest request, CancellationToken ct)
         {
-            // Get examiner ID from JWT token claims
+            // Lấy examinerId từ JWT claims
             var examinerId = Guid.Empty;
             if (User.Identity?.IsAuthenticated == true)
             {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-                    ?? User.FindFirst("UserId")?.Value 
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("UserId")?.Value
                     ?? User.FindFirst("sub")?.Value;
-                
+
                 if (Guid.TryParse(userIdClaim, out var userId))
                 {
                     examinerId = userId;
@@ -153,24 +152,25 @@ namespace API.Controllers
             }
 
             var result = await _gradingService.UpdateGradeAsync(gradeId, request, examinerId, ct);
+
             if (result == null)
             {
                 return NotFound();
             }
+
             return Ok(result);
         }
 
         [HttpPost("submissions/mark-zero")]
         public async Task<IActionResult> MarkZeroDueToViolations([FromBody] MarkZeroRequest request, CancellationToken ct)
         {
-            // Get examiner ID from JWT token claims
             var examinerId = Guid.Empty;
             if (User.Identity?.IsAuthenticated == true)
             {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-                    ?? User.FindFirst("UserId")?.Value 
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("UserId")?.Value
                     ?? User.FindFirst("sub")?.Value;
-                
+
                 if (Guid.TryParse(userIdClaim, out var userId))
                 {
                     examinerId = userId;
@@ -183,6 +183,7 @@ namespace API.Controllers
             }
 
             var result = await _gradingService.MarkZeroDueToViolationsAsync(request, examinerId, ct);
+
             return Ok(result);
         }
 
