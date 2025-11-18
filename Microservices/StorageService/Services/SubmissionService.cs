@@ -7,13 +7,19 @@ public class SubmissionService : ISubmissionService
 {
     private readonly ISubmissionRepository _submissionRepository;
     private readonly ILogger<SubmissionService> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
 
     public SubmissionService(
         ISubmissionRepository submissionRepository,
-        ILogger<SubmissionService> logger)
+        ILogger<SubmissionService> logger,
+        HttpClient httpClient,
+        IConfiguration configuration)
     {
         _submissionRepository = submissionRepository;
         _logger = logger;
+        _httpClient = httpClient;
+        _configuration = configuration;
     }
 
     public async Task<Submission?> GetByIdAsync(Guid id)
@@ -38,6 +44,15 @@ public class SubmissionService : ISubmissionService
 
     public async Task<Submission> CreateSubmissionAsync(Guid studentId, Guid examId, Guid examSessionId)
     {
+        // Validate exam exists by calling CoreService
+        var coreServiceUrl = _configuration["Services:CoreService"];
+        var examResponse = await _httpClient.GetAsync($"{coreServiceUrl}/api/exams/{examId}");
+        if (!examResponse.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Exam {ExamId} not found in CoreService", examId);
+            throw new InvalidOperationException("Invalid exam ID");
+        }
+
         // Check if student already has a submission for this exam
         var existing = await _submissionRepository.GetByStudentAndExamAsync(studentId, examId);
         if (existing != null)

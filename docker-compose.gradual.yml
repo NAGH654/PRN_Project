@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   # ========================================
-  # API GATEWAY - Single Entry Point
+  # API GATEWAY - Single Entry Point (YARP)
   # ========================================
   gateway:
     build:
@@ -131,6 +131,7 @@ services:
       - Jwt__Issuer=AssignmentGradingSystem
       - Jwt__Audience=AssignmentGradingUsers
       - Services__IdentityService=http://identity-service:80
+      - Services__StorageService=http://storage-service:80
     depends_on:
       assignment_grading_db:
         condition: service_healthy

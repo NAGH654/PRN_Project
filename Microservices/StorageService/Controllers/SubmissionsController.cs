@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StorageService.Services;
+using StorageService.Models;
 
 namespace StorageService.Controllers;
 
@@ -10,15 +11,21 @@ public class SubmissionsController : ControllerBase
     private readonly ISubmissionService _submissionService;
     private readonly ITextExtractionService _textExtractionService;
     private readonly ILogger<SubmissionsController> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
 
     public SubmissionsController(
         ISubmissionService submissionService,
         ITextExtractionService textExtractionService,
-        ILogger<SubmissionsController> logger)
+        ILogger<SubmissionsController> logger,
+        HttpClient httpClient,
+        IConfiguration configuration)
     {
         _submissionService = submissionService;
         _textExtractionService = textExtractionService;
         _logger = logger;
+        _httpClient = httpClient;
+        _configuration = configuration;
     }
 
     [HttpGet("{id:guid}")]
@@ -172,6 +179,49 @@ public class SubmissionsController : ControllerBase
         {
             _logger.LogError(ex, "Error getting submissions for session {SessionId}", sessionId);
             return StatusCode(500, new { message = "An error occurred while retrieving submissions" });
+        }
+    }
+
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(600L * 1024L * 1024L)]
+    public async Task<IActionResult> Upload([FromForm] UploadBatchForm form, CancellationToken ct)
+    {
+        // Validate session exists by calling CoreService
+        var coreServiceUrl = _configuration["Services:CoreService"];
+        var sessionResponse = await _httpClient.GetAsync($"{coreServiceUrl}/api/sessions/active", ct);
+        if (!sessionResponse.IsSuccessStatusCode)
+        {
+            return BadRequest("No active exam sessions available");
+        }
+
+        // TODO: Implement full file processing logic migrated from monolithic API
+        // For now, return a placeholder response
+        var result = new ProcessingResult
+        {
+            JobId = Guid.NewGuid().ToString(),
+            TotalFiles = 0,
+            SubmissionsCreated = 0,
+            ViolationsCreated = 0,
+            ImagesExtracted = 0
+        };
+
+        return Ok(result);
+    }
+
+    [HttpPost("upload/nested-zip")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(600L * 1024L * 1024L)]
+    public async Task<IActionResult> UploadNestedZip([FromForm] UploadBatchForm form, CancellationToken ct)
+    {
+        try
+        {
+            // TODO: Implement nested zip upload logic migrated from monolithic API
+            return Ok(new { message = "Nested ZIP upload endpoint - to be implemented" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message, detail = ex.ToString() });
         }
     }
 

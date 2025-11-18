@@ -74,8 +74,9 @@ public class NestedZipService : INestedZipService
             _logger.LogInformation("Found {Count} DOCX files to process", docxFiles.Count);
 
             // Step 3: Get existing file hashes to detect duplicates
+            var sessionIdGuid = Guid.Parse(form.SessionId!);
             var existingFiles = await _context.SubmissionFiles
-                .Where(f => f.Submission.ExamSessionId == form.SessionId && f.FileHash != null)
+                .Where(f => f.Submission.ExamSessionId == sessionIdGuid && f.FileHash != null)
                 .Select(f => f.FileHash!)
                 .ToListAsync(cancellationToken);
             var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -106,7 +107,7 @@ public class NestedZipService : INestedZipService
                         Id = Guid.NewGuid(),
                         StudentId = Guid.Empty, // Will need to lookup from Identity service
                         ExamId = Guid.Empty, // Will need to lookup from session
-                        ExamSessionId = form.SessionId,
+                        ExamSessionId = sessionIdGuid,
                         Status = "Completed",
                         SubmittedAt = DateTime.UtcNow,
                         ProcessedAt = DateTime.UtcNow,
