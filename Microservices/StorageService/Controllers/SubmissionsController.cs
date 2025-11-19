@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StorageService.Services;
 using StorageService.Models;
+using StorageService.DTOs;
 
 namespace StorageService.Controllers;
 
@@ -46,8 +47,8 @@ public class SubmissionsController : ControllerBase
         }
     }
 
-    [HttpGet("by-student/{studentId:guid}")]
-    public async Task<IActionResult> GetByStudent(Guid studentId)
+    [HttpGet("by-student/{studentId}")]
+    public async Task<IActionResult> GetByStudent(string studentId)
     {
         try
         {
@@ -211,7 +212,7 @@ public class SubmissionsController : ControllerBase
 
     [HttpPost("upload/nested-zip")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(600L * 1024L * 1024L)]
+    [RequestSizeLimit(2L * 1024L * 1024L * 1024L)] // 2GB limit
     public async Task<IActionResult> UploadNestedZip([FromForm] UploadBatchForm form, CancellationToken ct)
     {
         try
@@ -239,5 +240,5 @@ public class SubmissionsController : ControllerBase
     }
 }
 
-public record CreateSubmissionRequest(Guid StudentId, Guid ExamId, Guid ExamSessionId);
+public record CreateSubmissionRequest(string StudentId, Guid ExamId, Guid ExamSessionId);
 public record UpdateStatusRequest(string Status, string? Notes);

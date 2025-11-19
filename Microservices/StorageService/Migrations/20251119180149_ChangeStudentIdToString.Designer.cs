@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StorageService.Data;
 
@@ -11,9 +12,11 @@ using StorageService.Data;
 namespace StorageService.Migrations
 {
     [DbContext(typeof(StorageDbContext))]
-    partial class StorageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251119180149_ChangeStudentIdToString")]
+    partial class ChangeStudentIdToString
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -131,38 +134,6 @@ namespace StorageService.Migrations
                     b.ToTable("SubmissionFile", "Storage");
                 });
 
-            modelBuilder.Entity("StorageService.Entities.SubmissionImage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("ExtractedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ImageName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("ImagePath")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<long>("ImageSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("SubmissionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubmissionId");
-
-                    b.ToTable("SubmissionImage", "Storage");
-                });
-
             modelBuilder.Entity("StorageService.Entities.Violation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -226,17 +197,6 @@ namespace StorageService.Migrations
                     b.Navigation("Submission");
                 });
 
-            modelBuilder.Entity("StorageService.Entities.SubmissionImage", b =>
-                {
-                    b.HasOne("StorageService.Entities.Submission", "Submission")
-                        .WithMany("Images")
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Submission");
-                });
-
             modelBuilder.Entity("StorageService.Entities.Violation", b =>
                 {
                     b.HasOne("StorageService.Entities.Submission", "Submission")
@@ -251,8 +211,6 @@ namespace StorageService.Migrations
             modelBuilder.Entity("StorageService.Entities.Submission", b =>
                 {
                     b.Navigation("Files");
-
-                    b.Navigation("Images");
 
                     b.Navigation("Violations");
                 });

@@ -12,6 +12,7 @@ public class StorageDbContext : DbContext
     public DbSet<Submission> Submissions { get; set; }
     public DbSet<SubmissionFile> SubmissionFiles { get; set; }
     public DbSet<Violation> Violations { get; set; }
+    public DbSet<SubmissionImage> SubmissionImages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,12 @@ public class StorageDbContext : DbContext
             .HasOne(v => v.Submission)
             .WithMany(s => s.Violations)
             .HasForeignKey(v => v.SubmissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SubmissionImage>()
+            .HasOne(si => si.Submission)
+            .WithMany(s => s.Images)
+            .HasForeignKey(si => si.SubmissionId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Indexes for performance

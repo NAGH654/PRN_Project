@@ -1,5 +1,7 @@
 using StorageService.Entities;
 using StorageService.Repositories;
+using StorageService.DTOs;
+using Mapster;
 
 namespace StorageService.Services;
 
@@ -20,29 +22,44 @@ public class SubmissionService : ISubmissionService
         _logger = logger;
         _httpClient = httpClient;
         _configuration = configuration;
+
+        // Configure Mapster mappings
+        ConfigureMappings();
     }
 
-    public async Task<Submission?> GetByIdAsync(Guid id)
+    private void ConfigureMappings()
     {
-        return await _submissionRepository.GetByIdAsync(id);
+        TypeAdapterConfig<Submission, SubmissionDto>
+            .NewConfig()
+            .Map(dest => dest.FilesCount, src => src.Files.Count)
+            .Map(dest => dest.ViolationsCount, src => src.Violations.Count);
     }
 
-    public async Task<IEnumerable<Submission>> GetByStudentIdAsync(Guid studentId)
+    public async Task<SubmissionDto?> GetByIdAsync(Guid id)
     {
-        return await _submissionRepository.GetByStudentIdAsync(studentId);
+        var submission = await _submissionRepository.GetByIdAsync(id);
+        return submission?.Adapt<SubmissionDto>();
     }
 
-    public async Task<IEnumerable<Submission>> GetByExamIdAsync(Guid examId)
+    public async Task<IEnumerable<SubmissionDto>> GetByStudentIdAsync(string studentId)
     {
-        return await _submissionRepository.GetByExamIdAsync(examId);
+        var submissions = await _submissionRepository.GetByStudentIdAsync(studentId);
+        return submissions.Adapt<IEnumerable<SubmissionDto>>();
     }
 
-    public async Task<IEnumerable<Submission>> GetBySessionIdAsync(Guid sessionId)
+    public async Task<IEnumerable<SubmissionDto>> GetByExamIdAsync(Guid examId)
     {
-        return await _submissionRepository.GetBySessionIdAsync(sessionId);
+        var submissions = await _submissionRepository.GetByExamIdAsync(examId);
+        return submissions.Adapt<IEnumerable<SubmissionDto>>();
     }
 
-    public async Task<Submission> CreateSubmissionAsync(Guid studentId, Guid examId, Guid examSessionId)
+    public async Task<IEnumerable<SubmissionDto>> GetBySessionIdAsync(Guid sessionId)
+    {
+        var submissions = await _submissionRepository.GetBySessionIdAsync(sessionId);
+        return submissions.Adapt<IEnumerable<SubmissionDto>>();
+    }
+
+    public async Task<SubmissionDto> CreateSubmissionAsync(string studentId, Guid examId, Guid examSessionId)
     {
         // Validate exam exists by calling CoreService
         var coreServiceUrl = _configuration["Services:CoreService"];
@@ -73,11 +90,11 @@ public class SubmissionService : ISubmissionService
 
         var created = await _submissionRepository.CreateAsync(submission);
         _logger.LogInformation("Submission {Id} created for student {StudentId}", created.Id, studentId);
-        
-        return created;
+
+        return created.Adapt<SubmissionDto>();
     }
 
-    public async Task<Submission> UpdateSubmissionStatusAsync(Guid id, string status, string? notes = null)
+    public async Task<SubmissionDto> UpdateSubmissionStatusAsync(Guid id, string status, string? notes = null)
     {
         var submission = await _submissionRepository.GetByIdAsync(id);
         if (submission == null)
@@ -95,7 +112,7 @@ public class SubmissionService : ISubmissionService
 
         submission.Status = status;
         submission.ProcessingNotes = notes;
-        
+
         if (status == "Completed" || status == "Failed")
         {
             submission.ProcessedAt = DateTime.UtcNow;
@@ -103,8 +120,8 @@ public class SubmissionService : ISubmissionService
 
         var updated = await _submissionRepository.UpdateAsync(submission);
         _logger.LogInformation("Submission {Id} status updated to {Status}", id, status);
-        
-        return updated;
+
+        return updated.Adapt<SubmissionDto>();
     }
 
     public async Task<bool> DeleteAsync(Guid id)

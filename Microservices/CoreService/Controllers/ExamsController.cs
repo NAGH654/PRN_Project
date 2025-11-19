@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoreService.Services;
 using CoreService.DTOs;
+using CoreService.Entities;
 
 namespace CoreService.Controllers;
 
@@ -85,7 +86,7 @@ public class ExamsController : ControllerBase
     {
         try
         {
-            var exam = await _examService.CreateAsync(
+            var examDto = await _examService.CreateAsync(
                 request.Title,
                 request.Description,
                 request.SubjectId,
@@ -95,7 +96,7 @@ public class ExamsController : ControllerBase
                 request.TotalMarks
             );
 
-            return CreatedAtAction(nameof(GetById), new { id = exam.Id }, exam);
+            return CreatedAtAction(nameof(GetById), new { id = examDto.Id }, examDto);
         }
         catch (KeyNotFoundException ex)
         {
@@ -124,7 +125,7 @@ public class ExamsController : ControllerBase
     {
         try
         {
-            var exam = await _examService.UpdateAsync(
+            var examDto = await _examService.UpdateAsync(
                 id,
                 request.Title,
                 request.Description,
@@ -135,7 +136,7 @@ public class ExamsController : ControllerBase
                 request.TotalMarks
             );
 
-            return Ok(exam);
+            return Ok(examDto);
         }
         catch (KeyNotFoundException ex)
         {
@@ -178,14 +179,14 @@ public class ExamsController : ControllerBase
     {
         try
         {
-            var rubricItem = await _examService.AddRubricItemAsync(
+            var rubricItemDto = await _examService.AddRubricItemAsync(
                 examId,
                 request.Criteria,
                 request.Description,
                 request.MaxPoints
             );
 
-            return CreatedAtAction(nameof(GetById), new { id = examId }, rubricItem);
+            return CreatedAtAction(nameof(GetById), new { id = examId }, rubricItemDto);
         }
         catch (KeyNotFoundException ex)
         {
@@ -201,6 +202,70 @@ public class ExamsController : ControllerBase
         {
             _logger.LogError(ex, "Error adding rubric item to exam {ExamId}", examId);
             return StatusCode(500, new { message = "An error occurred while adding the rubric item" });
+        }
+    }
+
+    [HttpPut("{examId:guid}/rubrics/{rubricItemId:guid}")]
+    public async Task<IActionResult> UpdateRubricItem(Guid examId, Guid rubricItemId, [FromBody] UpdateRubricItemRequest request)
+    {
+        try
+        {
+            var rubricItemDto = await _examService.UpdateRubricItemAsync(
+                examId,
+                rubricItemId,
+                request.Criteria,
+                request.Description,
+                request.MaxPoints
+            );
+
+            return Ok(rubricItemDto);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Resource not found while updating rubric item {RubricItemId} in exam {ExamId}", rubricItemId, examId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while updating rubric item {RubricItemId} in exam {ExamId}", rubricItemId, examId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating rubric item {RubricItemId} in exam {ExamId}", rubricItemId, examId);
+            return StatusCode(500, new { message = "An error occurred while updating the rubric item" });
+        }
+    }
+
+    [HttpPost("{examId:guid}/rubrics/bulk")]
+    public async Task<IActionResult> AddRubricItemsBulk(Guid examId, [FromBody] IEnumerable<AddRubricItemRequest> requests)
+    {
+        try
+        {
+            var rubricItems = requests.Select(r => (r.Criteria, r.Description, r.MaxPoints));
+            var rubricItemDtos = await _examService.AddRubricItemsAsync(examId, rubricItems);
+
+            return CreatedAtAction(nameof(GetById), new { id = examId }, rubricItemDtos);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Resource not found while bulk adding rubric items to exam {ExamId}", examId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while bulk adding rubric items to exam {ExamId}", examId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid argument while bulk adding rubric items to exam {ExamId}", examId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error bulk adding rubric items to exam {ExamId}", examId);
+            return StatusCode(500, new { message = "An error occurred while bulk adding the rubric items" });
         }
     }
 
@@ -233,8 +298,8 @@ public class ExamsController : ControllerBase
     {
         try
         {
-            var exam = await _examService.PublishExamAsync(id);
-            return Ok(exam);
+            var examDto = await _examService.PublishExamAsync(id);
+            return Ok(examDto);
         }
         catch (KeyNotFoundException ex)
         {
@@ -319,6 +384,12 @@ public record UpdateExamRequest(
 );
 
 public record AddRubricItemRequest(
+    string Criteria,
+    string? Description,
+    decimal MaxPoints
+);
+
+public record UpdateRubricItemRequest(
     string Criteria,
     string? Description,
     decimal MaxPoints

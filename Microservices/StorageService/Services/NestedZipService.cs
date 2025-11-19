@@ -1,24 +1,34 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using StorageService.Data;
 using StorageService.Entities;
 using StorageService.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.RegularExpressions;
 
 namespace StorageService.Services;
 
 public class NestedZipService : INestedZipService
 {
+    private static readonly Regex StudentIdRegex = new Regex(@"^[A-Za-z]{2}\d{6}$", RegexOptions.Compiled);
+    private static readonly Regex ProhibitedPatternRegex = new Regex(@"System\.out\.println", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private readonly StorageDbContext _context;
     private readonly ILogger<NestedZipService> _logger;
     private readonly string _storagePath;
-    private static readonly Regex StudentIdRegex = new Regex(@"^[A-Z]{2}\d{6,10}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private readonly IConfiguration _configuration;
+    private readonly HttpClient _httpClient;
 
-    public NestedZipService(StorageDbContext context, ILogger<NestedZipService> logger, IConfiguration configuration)
+    public NestedZipService(
+        StorageDbContext context,
+        ILogger<NestedZipService> logger,
+        IConfiguration configuration,
+        HttpClient httpClient)
     {
         _context = context;
         _logger = logger;
+        _configuration = configuration;
+        _httpClient = httpClient;
         _storagePath = configuration["Storage:BasePath"] ?? Path.Combine(AppContext.BaseDirectory, "storage");
     }
 
@@ -26,10 +36,16 @@ public class NestedZipService : INestedZipService
     {
         try
         {
-            if (form.Archive == null || form.Archive.Length == 0)
+            // Validate exam exists and is active
+            var examIdGuid = Guid.Parse(form.ExamId!);
+            var exam = await ValidateExamAsync(examIdGuid, cancellationToken);
+            if (exam == null)
             {
-                throw new ArgumentException("Archive file is required and cannot be empty.");
+                throw new InvalidOperationException("Exam not found or not active.");
             }
+
+            // Validate archive file
+            ValidateArchive(form.Archive);
 
             var jobId = Guid.NewGuid().ToString();
             var uploadsDir = EnsureDirectory(Path.Combine(_storagePath, "uploads", DateTime.UtcNow.ToString("yyyyMMddHHmmss")));
@@ -45,22 +61,24 @@ public class NestedZipService : INestedZipService
             }
             _logger.LogInformation("File saved to: {UploadPath}", uploadPath);
 
-            _logger.LogInformation("Starting archive extraction...");
-            await ExtractArchiveAsync(uploadPath, extractDir, cancellationToken);
-            _logger.LogInformation("Archive extraction completed. Extract directory: {ExtractDir}", extractDir);
-
             var result = new ProcessingResult
             {
                 JobId = jobId,
                 UploadPath = uploadPath,
-                ExtractPath = extractDir
+                ExtractPath = extractDir,
+                CreatedSubmissions = new List<CreatedSubmissionInfo>()
             };
 
-            // Step 1: Extract all nested solution.zip files
+            // Step 1: Extract main archive (ZIP/RAR)
+            _logger.LogInformation("Starting archive extraction...");
+            await ExtractArchiveAsync(uploadPath, extractDir, cancellationToken);
+            _logger.LogInformation("Archive extraction completed. Extract directory: {ExtractDir}", extractDir);
+
+            // Step 2: Extract all nested solution.zip files
             _logger.LogInformation("Searching for nested solution.zip files...");
             await ExtractAllNestedSolutionZipAsync(extractDir, cancellationToken);
 
-            // Step 2: Find DOCX files from extracted directories
+            // Step 3: Find all DOCX files from extracted directories
             var docxFiles = new List<string>();
             var extractedZipDirs = Directory.GetDirectories(extractDir, "solution_extracted", SearchOption.AllDirectories);
             foreach (var zipDir in extractedZipDirs)
@@ -73,105 +91,105 @@ public class NestedZipService : INestedZipService
             result.TotalFiles = docxFiles.Count;
             _logger.LogInformation("Found {Count} DOCX files to process", docxFiles.Count);
 
-            // Step 3: Get existing file hashes to detect duplicates
-            var sessionIdGuid = Guid.Parse(form.SessionId!);
+            if (docxFiles.Count == 0)
+            {
+                result.Message = "No DOCX files found in the archive.";
+                return result;
+            }
+
+            // Step 4: Get existing file hashes for duplicate detection
             var existingFiles = await _context.SubmissionFiles
-                .Where(f => f.Submission.ExamSessionId == sessionIdGuid && f.FileHash != null)
+                .Where(f => f.Submission.ExamId == examIdGuid && f.FileHash != null)
                 .Select(f => f.FileHash!)
                 .ToListAsync(cancellationToken);
             var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // Step 4: Process each DOCX file
-            var submissionFiles = new List<SubmissionFile>();
-            foreach (var file in docxFiles)
+            // Step 5: Process files in batches for performance
+            const int batchSize = 50;
+            var processedCount = 0;
+
+            for (int i = 0; i < docxFiles.Count; i += batchSize)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
-                {
-                    var fileName = Path.GetFileName(file);
-                    var (studentId, studentName) = ParseStudentInfo(fileName);
-                    var hash = await ComputeSha256Async(file, cancellationToken);
-                    var isDuplicate = (hash != null && (existingFiles.Contains(hash) || !batchHashes.Add(hash)));
-
-                    if (isDuplicate)
-                    {
-                        result.DuplicateFiles++;
-                        _logger.LogWarning("Duplicate file detected: {FileName}", fileName);
-                        continue;
-                    }
-
-                    // Create submission record
-                    var submission = new Submission
-                    {
-                        Id = Guid.NewGuid(),
-                        StudentId = Guid.Empty, // Will need to lookup from Identity service
-                        ExamId = Guid.Empty, // Will need to lookup from session
-                        ExamSessionId = sessionIdGuid,
-                        Status = "Completed",
-                        SubmittedAt = DateTime.UtcNow,
-                        ProcessedAt = DateTime.UtcNow,
-                        TotalFiles = 1,
-                        TotalSizeBytes = new FileInfo(file).Length
-                    };
-
-                    // Create submission file record
-                    var submissionFile = new SubmissionFile
-                    {
-                        Id = Guid.NewGuid(),
-                        SubmissionId = submission.Id,
-                        FileName = fileName,
-                        FilePath = MakeRelativePath(_storagePath, file),
-                        FileSizeBytes = new FileInfo(file).Length,
-                        FileHash = hash,
-                        FileType = "docx",
-                        UploadedAt = DateTime.UtcNow,
-                        Submission = submission
-                    };
-
-                    submissionFiles.Add(submissionFile);
-                    result.ProcessedFiles++;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error processing file: {File}", file);
-                    result.ErrorFiles++;
-                }
+                var batch = docxFiles.Skip(i).Take(batchSize).ToList();
+                await ProcessBatchAsync(batch, examIdGuid, existingFiles, batchHashes, result, cancellationToken);
+                processedCount += batch.Count;
+                _logger.LogInformation("Processed {Processed}/{Total} files", processedCount, docxFiles.Count);
             }
 
-            // Step 5: Save to database
-            if (submissionFiles.Any())
-            {
-                await _context.SubmissionFiles.AddRangeAsync(submissionFiles, cancellationToken);
-                await _context.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Saved {Count} submission files to database", submissionFiles.Count);
-            }
-
-            result.Message = $"Processing completed. Processed: {result.ProcessedFiles}, Duplicates: {result.DuplicateFiles}, Errors: {result.ErrorFiles}";
+            result.Message = $"Processing completed. Processed: {result.ProcessedFiles}, Duplicates: {result.DuplicateFiles}, Violations: {result.ViolationsCreated}, Images: {result.ImagesExtracted}, Errors: {result.ErrorFiles}";
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing nested ZIP archive");
+            _logger.LogError(ex, "Error processing nested ZIP archive. File: {FileName}, ExamId: {ExamId}",
+                form.Archive.FileName, form.ExamId);
             throw new InvalidOperationException($"Failed to process nested ZIP archive: {ex.Message}", ex);
         }
     }
 
-    private Task ExtractArchiveAsync(string archivePath, string extractDir, CancellationToken cancellationToken)
+    private async Task ExtractArchiveAsync(string archivePath, string extractDir, CancellationToken cancellationToken)
     {
-        return Task.Run(() =>
+        var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+
+        if (ext == ".zip")
         {
             try
             {
                 ZipFile.ExtractToDirectory(archivePath, extractDir, true);
-                _logger.LogInformation("Extracted archive to: {ExtractDir}", extractDir);
+                _logger.LogInformation("Extracted ZIP archive to: {ExtractDir}", extractDir);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to extract archive: {ArchivePath}", archivePath);
-                throw;
+                _logger.LogError(ex, "Failed to extract ZIP file: {ArchivePath}", archivePath);
+                throw new InvalidOperationException($"Failed to extract ZIP file: {ex.Message}", ex);
             }
-        }, cancellationToken);
+        }
+        else if (ext == ".rar")
+        {
+            var sevenZip = _configuration["Storage:SevenZipPath"];
+            if (string.IsNullOrEmpty(sevenZip) || !File.Exists(sevenZip))
+            {
+                _logger.LogError("7-Zip executable not found at: {SevenZipPath}", sevenZip);
+                throw new InvalidOperationException($"7-Zip executable not found. Please configure Storage:SevenZipPath in appsettings.json");
+            }
+
+            _logger.LogInformation("Extracting RAR using 7-Zip: {ArchivePath} to {ExtractDir}", archivePath, extractDir);
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = sevenZip,
+                Arguments = $"x -y -o\"{extractDir}\" \"{archivePath}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null)
+            {
+                _logger.LogError("Failed to start 7-Zip process for: {ArchivePath}", archivePath);
+                throw new InvalidOperationException("Failed to start 7-Zip process.");
+            }
+
+            var output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
+            var error = await proc.StandardError.ReadToEndAsync(cancellationToken);
+            await proc.WaitForExitAsync(cancellationToken);
+
+            if (proc.ExitCode != 0)
+            {
+                _logger.LogError("7-Zip extraction failed. ExitCode: {ExitCode}, Error: {Error}, Output: {Output}",
+                    proc.ExitCode, error, output);
+                throw new InvalidOperationException(
+                    $"Failed to extract RAR file. The file may be corrupted, password protected, or contain invalid entries.");
+            }
+
+            _logger.LogInformation("Successfully extracted RAR file: {ArchivePath}", archivePath);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported archive format: {ext}. Only .zip and .rar are supported.");
+        }
     }
 
     private Task ExtractAllNestedSolutionZipAsync(string extractDir, CancellationToken cancellationToken)
@@ -280,6 +298,261 @@ public class NestedZipService : INestedZipService
         catch
         {
             return null;
+        }
+    }
+
+    private async Task<dynamic?> ValidateExamAsync(Guid examId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var coreServiceUrl = _configuration["Services:CoreService"];
+            var response = await _httpClient.GetAsync($"{coreServiceUrl}/api/exams/{examId}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Exam {ExamId} not found in CoreService", examId);
+                return null;
+            }
+
+            // For now, assume exam is valid if it exists and check status
+            // In a full implementation, we'd parse the response to check if it's active
+            return new { Id = examId, IsActive = true };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating exam {ExamId}", examId);
+            return null;
+        }
+    }
+
+    private async Task ProcessBatchAsync(
+        List<string> files,
+        Guid examId,
+        List<string> existingHashes,
+        HashSet<string> batchHashes,
+        ProcessingResult result,
+        CancellationToken cancellationToken)
+    {
+        var submissions = new List<Submission>();
+        var submissionFiles = new List<SubmissionFile>();
+        var violations = new List<Violation>();
+        var submissionImages = new List<SubmissionImage>();
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var fileName = Path.GetFileName(file);
+                var (studentId, studentName) = ParseStudentInfo(fileName);
+                var hasValidName = studentId != null && StudentIdRegex.IsMatch(studentId);
+
+                var hash = await ComputeSha256Async(file, cancellationToken);
+                var isDuplicate = (hash != null && (existingHashes.Contains(hash) || !batchHashes.Add(hash)));
+
+                // Create submission record
+                var submission = new Submission
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId ?? "UNKNOWN",
+                    ExamId = examId,
+                    Status = "Processing",
+                    SubmittedAt = DateTime.UtcNow,
+                    TotalFiles = 1,
+                    TotalSizeBytes = new FileInfo(file).Length
+                };
+
+                // Create submission file record
+                var submissionFile = new SubmissionFile
+                {
+                    Id = Guid.NewGuid(),
+                    SubmissionId = submission.Id,
+                    FileName = fileName,
+                    FilePath = MakeRelativePath(_storagePath, file),
+                    FileSizeBytes = new FileInfo(file).Length,
+                    FileHash = hash,
+                    FileType = "docx",
+                    UploadedAt = DateTime.UtcNow,
+                    Submission = submission
+                };
+
+                // Check for naming violation
+                if (!hasValidName)
+                {
+                    violations.Add(new Violation
+                    {
+                        Id = Guid.NewGuid(),
+                        SubmissionId = submission.Id,
+                        Type = "Naming",
+                        Severity = "Warning",
+                        Description = $"Invalid naming convention for file: {fileName}. Expected format: StudentID_ExamName.ext",
+                        DetectedAt = DateTime.UtcNow
+                    });
+                    result.ViolationsCreated++;
+                }
+
+                // Check for duplicate violation
+                if (isDuplicate)
+                {
+                    violations.Add(new Violation
+                    {
+                        Id = Guid.NewGuid(),
+                        SubmissionId = submission.Id,
+                        Type = "Duplicate",
+                        Severity = "Error",
+                        Description = $"Duplicate content detected: {fileName}",
+                        DetectedAt = DateTime.UtcNow
+                    });
+                    result.ViolationsCreated++;
+                    result.DuplicateFiles++;
+                    continue; // Skip duplicate files
+                }
+
+                // Check for content violations in code files
+                if (IsCodeFile(file))
+                {
+                    try
+                    {
+                        var text = await File.ReadAllTextAsync(file, cancellationToken);
+                        if (ProhibitedPatternRegex.IsMatch(text))
+                        {
+                            violations.Add(new Violation
+                            {
+                                Id = Guid.NewGuid(),
+                                SubmissionId = submission.Id,
+                                Type = "Content",
+                                Severity = "Warning",
+                                Description = $"Prohibited pattern 'System.out.println' found in: {fileName}",
+                                DetectedAt = DateTime.UtcNow
+                            });
+                            result.ViolationsCreated++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to read file for pattern scan: {File}", file);
+                    }
+                }
+
+                // Extract images from DOCX
+                if (string.Equals(Path.GetExtension(file), ".docx", StringComparison.OrdinalIgnoreCase))
+                {
+                    var imagesExtracted = await ExtractImagesFromDocxAsync(file, _storagePath, submission, cancellationToken);
+                    result.ImagesExtracted += imagesExtracted;
+                }
+
+                submissions.Add(submission);
+                submissionFiles.Add(submissionFile);
+                result.ProcessedFiles++;
+
+                // Add to created submissions list
+                result.CreatedSubmissions.Add(new CreatedSubmissionInfo
+                {
+                    SubmissionId = submission.Id,
+                    StudentId = submission.StudentId,
+                    StudentName = studentName ?? "Unknown",
+                    FileName = submissionFile.FileName
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process file: {File}. Continuing with other files.", file);
+                result.ErrorFiles++;
+            }
+        }
+
+        // Save batch to database
+        if (submissions.Any())
+        {
+            await _context.Submissions.AddRangeAsync(submissions, cancellationToken);
+            await _context.SubmissionFiles.AddRangeAsync(submissionFiles, cancellationToken);
+
+            if (violations.Any())
+            {
+                await _context.Violations.AddRangeAsync(violations, cancellationToken);
+            }
+
+            if (submissionImages.Any())
+            {
+                await _context.SubmissionImages.AddRangeAsync(submissionImages, cancellationToken);
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Update submission status to Pending
+            foreach (var submission in submissions)
+            {
+                submission.Status = "Pending";
+                submission.ProcessedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static bool IsCodeFile(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".cs" or ".java" or ".cpp" or ".c" or ".py" or ".js" or ".ts";
+    }
+
+    private static void ValidateArchive(IFormFile file)
+    {
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext != ".zip" && ext != ".rar")
+        {
+            throw new InvalidOperationException("Invalid file format. Only .zip and .rar are supported.");
+        }
+        // 2 GB limit for large exam archives
+        if (file.Length > 2L * 1024L * 1024L * 1024L)
+        {
+            throw new InvalidOperationException("File is too large. Maximum 2GB.");
+        }
+    }
+
+    private async Task<int> ExtractImagesFromDocxAsync(string docxPath, string storageRoot, Submission submission, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var archive = ZipFile.OpenRead(docxPath);
+            var mediaEntries = archive.Entries
+                .Where(e => e.FullName.StartsWith("word/media/", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(e.Name))
+                .ToList();
+
+            if (mediaEntries.Count == 0) return 0;
+
+            var imagesDir = EnsureDirectory(Path.Combine(storageRoot, "jobs", submission.Id.ToString(), "images"));
+            var images = new List<SubmissionImage>();
+
+            foreach (var entry in mediaEntries)
+            {
+                var outPath = Path.Combine(imagesDir, entry.Name);
+                entry.ExtractToFile(outPath, true);
+
+                images.Add(new SubmissionImage
+                {
+                    Id = Guid.NewGuid(),
+                    SubmissionId = submission.Id,
+                    ImageName = entry.Name,
+                    ImagePath = MakeRelativePath(storageRoot, outPath),
+                    ImageSizeBytes = new FileInfo(outPath).Length,
+                    ExtractedAt = DateTime.UtcNow,
+                    Submission = submission
+                });
+            }
+
+            if (images.Any())
+            {
+                await _context.SubmissionImages.AddRangeAsync(images, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            return images.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to extract images from DOCX: {File}", submission.Id);
+            return 0;
         }
     }
 
