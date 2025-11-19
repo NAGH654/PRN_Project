@@ -1,5 +1,7 @@
+using CoreService.DTOs;
 using CoreService.Entities;
 using CoreService.Repositories;
+using Mapster;
 
 namespace CoreService.Services;
 
@@ -12,21 +14,33 @@ public class SubjectService : ISubjectService
     {
         _subjectRepository = subjectRepository;
         _logger = logger;
+
+        // Configure Mapster mappings
+        ConfigureMappings();
     }
 
-    public async Task<Subject?> GetByIdAsync(Guid id)
+    private void ConfigureMappings()
     {
-        return await _subjectRepository.GetByIdAsync(id);
+        // Basic mapping - all properties map by name/convention
+        TypeAdapterConfig<Subject, SubjectDto>.NewConfig();
     }
 
-    public async Task<Subject?> GetByCodeAsync(string code)
+    public async Task<SubjectDto?> GetByIdAsync(Guid id)
     {
-        return await _subjectRepository.GetByCodeAsync(code);
+        var subject = await _subjectRepository.GetByIdAsync(id);
+        return subject?.Adapt<SubjectDto>();
     }
 
-    public async Task<IEnumerable<Subject>> GetAllAsync()
+    public async Task<SubjectDto?> GetByCodeAsync(string code)
     {
-        return await _subjectRepository.GetAllAsync();
+        var subject = await _subjectRepository.GetByCodeAsync(code);
+        return subject?.Adapt<SubjectDto>();
+    }
+
+    public async Task<IEnumerable<SubjectDto>> GetAllAsync()
+    {
+        var subjects = await _subjectRepository.GetAllAsync();
+        return subjects.Adapt<IEnumerable<SubjectDto>>();
     }
 
     public async Task<Subject> CreateAsync(string code, string name, string? description, int credits)

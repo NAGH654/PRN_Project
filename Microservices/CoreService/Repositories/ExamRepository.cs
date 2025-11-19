@@ -16,8 +16,6 @@ public class ExamRepository : IExamRepository
     public async Task<Exam?> GetByIdAsync(Guid id)
     {
         return await _context.Exams
-            .Include(e => e.Subject)
-            .Include(e => e.Semester)
             .Include(e => e.RubricItems)
             .Include(e => e.ExamSessions)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -28,15 +26,16 @@ public class ExamRepository : IExamRepository
         return await _context.Exams
             .Include(e => e.Subject)
             .Include(e => e.Semester)
+            .Include(e => e.RubricItems)
+            .Include(e => e.ExamSessions)
             .OrderByDescending(e => e.ExamDate)
+            .AsNoTracking()
             .ToListAsync();
     }
 
     public async Task<IEnumerable<Exam>> GetBySubjectIdAsync(Guid subjectId)
     {
         return await _context.Exams
-            .Include(e => e.Subject)
-            .Include(e => e.Semester)
             .Where(e => e.SubjectId == subjectId)
             .OrderByDescending(e => e.ExamDate)
             .ToListAsync();
@@ -45,11 +44,14 @@ public class ExamRepository : IExamRepository
     public async Task<IEnumerable<Exam>> GetBySemesterIdAsync(Guid semesterId)
     {
         return await _context.Exams
-            .Include(e => e.Subject)
-            .Include(e => e.Semester)
             .Where(e => e.SemesterId == semesterId)
             .OrderByDescending(e => e.ExamDate)
             .ToListAsync();
+    }
+
+    public async Task<bool> TitleExistsAsync(string title)
+    {
+        return await _context.Exams.AnyAsync(e => e.Title == title);
     }
 
     public async Task<Exam> CreateAsync(Exam exam)

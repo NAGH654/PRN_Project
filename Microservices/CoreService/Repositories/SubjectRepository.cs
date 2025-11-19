@@ -30,6 +30,7 @@ public class SubjectRepository : ISubjectRepository
     {
         return await _context.Subjects
             .OrderBy(s => s.Code)
+            .AsNoTracking()
             .ToListAsync();
     }
 

@@ -1,7 +1,7 @@
 {
 	"info": {
 		"name": "Microservices Assignment Grading API",
-		"description": "Complete API collection for testing all microservices endpoints through the Gateway",
+		"description": "Complete API collection for testing all microservices endpoints through the Gateway. Includes Use Case 1: Exam Setup & Management with rubric management and examiner assignment.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -200,6 +200,120 @@
 			]
 		},
 		{
+			"name": "Semesters",
+			"item": [
+				{
+					"name": "Get All Semesters",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/semesters",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "semesters"]
+						}
+					}
+				},
+				{
+					"name": "Get Semester By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/semesters/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "semesters", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Semester",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Fall 2025\",\n  \"startDate\": \"2025-09-01T00:00:00Z\",\n  \"endDate\": \"2025-12-31T23:59:59Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/semesters",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "semesters"]
+						}
+					}
+				},
+				{
+					"name": "Update Semester",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Spring 2025\",\n  \"startDate\": \"2025-01-01T00:00:00Z\",\n  \"endDate\": \"2025-05-31T23:59:59Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/semesters/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "semesters", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Semester",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/semesters/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "semesters", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
 			"name": "Exams",
 			"item": [
 				{
@@ -240,6 +354,10 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
 							}
 						],
 						"body": {
@@ -250,7 +368,8 @@
 							"raw": "{{baseUrl}}/api/exams",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "exams"]
-						}
+						},
+						"description": "Create a new exam in draft status with validation"
 					}
 				},
 				{
@@ -261,6 +380,10 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
 							}
 						],
 						"body": {
@@ -277,14 +400,20 @@
 									"value": "00000000-0000-0000-0000-000000000001"
 								}
 							]
-						}
+						},
+						"description": "Update an exam (draft status only)"
 					}
 				},
 				{
 					"name": "Delete Exam",
 					"request": {
 						"method": "DELETE",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/exams/:id",
 							"host": ["{{baseUrl}}"],
@@ -295,7 +424,152 @@
 									"value": "00000000-0000-0000-0000-000000000001"
 								}
 							]
-						}
+						},
+						"description": "Delete an exam (draft status only)"
+					}
+				},
+				{
+					"name": "Add Rubric Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"criteria\": \"Code Quality\",\n  \"description\": \"Evaluate code structure, comments, and best practices\",\n  \"maxPoints\": 30\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:examId/rubrics",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":examId", "rubrics"],
+							"variable": [
+								{
+									"key": "examId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						},
+						"description": "Add a rubric item to an exam (draft status only)"
+					}
+				},
+				{
+					"name": "Remove Rubric Item",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:examId/rubrics/:rubricItemId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":examId", "rubrics", ":rubricItemId"],
+							"variable": [
+								{
+									"key": "examId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								},
+								{
+									"key": "rubricItemId",
+									"value": "00000000-0000-0000-0000-000000000002"
+								}
+							]
+						},
+						"description": "Remove a rubric item from an exam (draft status only)"
+					}
+				},
+				{
+					"name": "Publish Exam",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/:id/publish",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", ":id", "publish"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						},
+						"description": "Publish a draft exam to Active status (creates exam session automatically)"
+					}
+				},
+				{
+					"name": "Assign Examiner",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"examinerId\": \"00000000-0000-0000-0000-000000000003\",\n  \"role\": \"Examiner\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/sessions/:sessionId/examiners",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "sessions", ":sessionId", "examiners"],
+							"variable": [
+								{
+									"key": "sessionId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								}
+							]
+						},
+						"description": "Assign an examiner to an exam session (max 5 examiners)"
+					}
+				},
+				{
+					"name": "Remove Examiner Assignment",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/sessions/:sessionId/examiners/:examinerId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "sessions", ":sessionId", "examiners", ":examinerId"],
+							"variable": [
+								{
+									"key": "sessionId",
+									"value": "00000000-0000-0000-0000-000000000001"
+								},
+								{
+									"key": "examinerId",
+									"value": "00000000-0000-0000-0000-000000000003"
+								}
+							]
+						},
+						"description": "Remove an examiner assignment from an exam session"
 					}
 				}
 			]

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using CoreService.Services;
+using CoreService.DTOs;
 
 namespace CoreService.Controllers;
 
@@ -101,6 +102,11 @@ public class ExamsController : ControllerBase
             _logger.LogWarning(ex, "Resource not found while creating exam");
             return NotFound(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation while creating exam");
+            return BadRequest(new { message = ex.Message });
+        }
         catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Invalid argument while creating exam");
@@ -165,6 +171,131 @@ public class ExamsController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while deleting the exam" });
         }
     }
+
+    // Rubric Management
+    [HttpPost("{examId:guid}/rubrics")]
+    public async Task<IActionResult> AddRubricItem(Guid examId, [FromBody] AddRubricItemRequest request)
+    {
+        try
+        {
+            var rubricItem = await _examService.AddRubricItemAsync(
+                examId,
+                request.Criteria,
+                request.Description,
+                request.MaxPoints
+            );
+
+            return CreatedAtAction(nameof(GetById), new { id = examId }, rubricItem);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Resource not found while adding rubric item to exam {ExamId}", examId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while adding rubric item to exam {ExamId}", examId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding rubric item to exam {ExamId}", examId);
+            return StatusCode(500, new { message = "An error occurred while adding the rubric item" });
+        }
+    }
+
+    [HttpDelete("{examId:guid}/rubrics/{rubricItemId:guid}")]
+    public async Task<IActionResult> RemoveRubricItem(Guid examId, Guid rubricItemId)
+    {
+        try
+        {
+            var removed = await _examService.RemoveRubricItemAsync(examId, rubricItemId);
+            if (!removed)
+                return NotFound(new { message = "Rubric item not found" });
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while removing rubric item from exam {ExamId}", examId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing rubric item {RubricItemId} from exam {ExamId}", rubricItemId, examId);
+            return StatusCode(500, new { message = "An error occurred while removing the rubric item" });
+        }
+    }
+
+    // Publishing
+    [HttpPost("{id:guid}/publish")]
+    public async Task<IActionResult> PublishExam(Guid id)
+    {
+        try
+        {
+            var exam = await _examService.PublishExamAsync(id);
+            return Ok(exam);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Exam {Id} not found for publishing", id);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while publishing exam {Id}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error publishing exam {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while publishing the exam" });
+        }
+    }
+
+    // Examiner Assignment
+    [HttpPost("sessions/{sessionId:guid}/examiners")]
+    public async Task<IActionResult> AssignExaminer(Guid sessionId, [FromBody] AssignExaminerRequest request)
+    {
+        try
+        {
+            var assignment = await _examService.AssignExaminerAsync(sessionId, request.ExaminerId, request.Role);
+            return CreatedAtAction(nameof(GetById), new { id = sessionId }, assignment);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Resource not found while assigning examiner to session {SessionId}", sessionId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid operation while assigning examiner to session {SessionId}", sessionId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning examiner to session {SessionId}", sessionId);
+            return StatusCode(500, new { message = "An error occurred while assigning the examiner" });
+        }
+    }
+
+    [HttpDelete("sessions/{sessionId:guid}/examiners/{examinerId:guid}")]
+    public async Task<IActionResult> RemoveExaminerAssignment(Guid sessionId, Guid examinerId)
+    {
+        try
+        {
+            var removed = await _examService.RemoveExaminerAssignmentAsync(sessionId, examinerId);
+            if (!removed)
+                return NotFound(new { message = "Examiner assignment not found" });
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing examiner {ExaminerId} from session {SessionId}", examinerId, sessionId);
+            return StatusCode(500, new { message = "An error occurred while removing the examiner assignment" });
+        }
+    }
 }
 
 public record CreateExamRequest(
@@ -185,4 +316,15 @@ public record UpdateExamRequest(
     DateTime ExamDate,
     int DurationMinutes,
     decimal TotalMarks
+);
+
+public record AddRubricItemRequest(
+    string Criteria,
+    string? Description,
+    decimal MaxPoints
+);
+
+public record AssignExaminerRequest(
+    Guid ExaminerId,
+    string Role = "Examiner"
 );
