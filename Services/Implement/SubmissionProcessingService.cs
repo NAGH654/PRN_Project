@@ -13,6 +13,7 @@ using Repositories.Entities;
 using Repositories.Entities.Enums;
 using Services.Dtos;
 using Services.Dtos.Requests;
+using Services.Dtos.Responses;
 using Services.Interfaces;
 using Services.Models;
 
@@ -25,12 +26,18 @@ namespace Services.Implement
         private readonly AppDbContext _db;
         private readonly StorageOptions _storageOptions;
         private readonly ILogger<SubmissionProcessingService> _logger;
+        private readonly INotificationService _notificationService;
 
-        public SubmissionProcessingService(AppDbContext db, IOptions<StorageOptions> storageOptions, ILogger<SubmissionProcessingService> logger)
+        public SubmissionProcessingService(
+            AppDbContext db,
+            IOptions<StorageOptions> storageOptions,
+            ILogger<SubmissionProcessingService> logger,
+            INotificationService notificationService)
         {
             _db = db;
             _storageOptions = storageOptions.Value;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         public async Task<ProcessingResult> ProcessArchiveAsync(UploadBatchForm form, CancellationToken cancellationToken = default)
@@ -72,6 +79,8 @@ namespace Services.Implement
                 .Select(s => s.ContentHash!)
                 .ToListAsync(cancellationToken);
             var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sessionSubmissionCount = await _db.Submissions
+                .CountAsync(s => s.SessionId == session.SessionId, cancellationToken);
 
             foreach (var file in files)
             {
@@ -101,28 +110,34 @@ namespace Services.Implement
                 await _db.SaveChangesAsync(cancellationToken);
                 result.SubmissionsCreated++;
 
+                var violationsForSubmission = new List<Violation>();
+
                 if (!hasValidName)
                 {
-                    _db.Violations.Add(new Violation
+                    var violation = new Violation
                     {
                         SubmissionId = submission.SubmissionId,
                         ViolationType = ViolationType.Naming,
                         Severity = ViolationSeverity.Warning,
                         Description = "Invalid naming convention. Expected StudentID_ExamName.ext",
                         DetectedAt = DateTime.UtcNow
-                    });
+                    };
+                    _db.Violations.Add(violation);
+                    violationsForSubmission.Add(violation);
                     result.ViolationsCreated++;
                 }
                 if (isDuplicate)
                 {
-                    _db.Violations.Add(new Violation
+                    var violation = new Violation
                     {
                         SubmissionId = submission.SubmissionId,
                         ViolationType = ViolationType.Duplicate,
                         Severity = ViolationSeverity.Error,
                         Description = "Duplicate content detected within session.",
                         DetectedAt = DateTime.UtcNow
-                    });
+                    };
+                    _db.Violations.Add(violation);
+                    violationsForSubmission.Add(violation);
                     result.ViolationsCreated++;
                 }
 
@@ -132,14 +147,16 @@ namespace Services.Implement
                     var text = await File.ReadAllTextAsync(file, cancellationToken);
                     if (text.Contains("System.out.println", StringComparison.Ordinal))
                     {
-                        _db.Violations.Add(new Violation
+                        var violation = new Violation
                         {
                             SubmissionId = submission.SubmissionId,
                             ViolationType = ViolationType.Content,
                             Severity = ViolationSeverity.Warning,
                             Description = "Prohibited pattern 'System.out.println' found.",
                             DetectedAt = DateTime.UtcNow
-                        });
+                        };
+                        _db.Violations.Add(violation);
+                        violationsForSubmission.Add(violation);
                         result.ViolationsCreated++;
                     }
                 }
@@ -153,6 +170,12 @@ namespace Services.Implement
                 submission.Status = SubmissionStatus.Pending;
                 _db.Submissions.Update(submission);
                 await _db.SaveChangesAsync(cancellationToken);
+
+                sessionSubmissionCount = await DispatchSubmissionNotificationsAsync(
+                    session,
+                    new[] { submission },
+                    violationsForSubmission,
+                    sessionSubmissionCount);
 
                 // add created submission info for immediate UI usage
                 result.CreatedSubmissions.Add(new CreatedSubmissionInfo
@@ -234,6 +257,8 @@ namespace Services.Implement
                     .Select(s => s.ContentHash!)
                     .ToListAsync(cancellationToken);
                 var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var sessionSubmissionCount = await _db.Submissions
+                    .CountAsync(s => s.SessionId == session.SessionId, cancellationToken);
 
                 const int batchSize = 50; // Process in batches to improve performance
                 var submissions = new List<Submission>();
@@ -339,7 +364,8 @@ namespace Services.Implement
                                 });
                             }
                             result.SubmissionsCreated += submissions.Count;
-                            result.ViolationsCreated += violationsMap.Values.SelectMany(v => v).Count();
+                            var violationsForBatch = violationsMap.Values.SelectMany(v => v).ToList();
+                            result.ViolationsCreated += violationsForBatch.Count;
                             violationsMap.Clear();
 
                             // Extract images for this batch
@@ -365,6 +391,12 @@ namespace Services.Implement
                                 sub.Status = SubmissionStatus.Pending;
                             }
                             await _db.SaveChangesAsync(cancellationToken);
+
+                            sessionSubmissionCount = await DispatchSubmissionNotificationsAsync(
+                                session,
+                                submissions,
+                                violationsForBatch,
+                                sessionSubmissionCount);
 
                             processedCount += submissions.Count;
                             _logger.LogInformation("Processed {Processed}/{Total} files", processedCount, docxFiles.Count);
@@ -394,7 +426,9 @@ namespace Services.Implement
                         });
                     }
                     result.SubmissionsCreated += submissions.Count;
-                    result.ViolationsCreated += violationsMap.Values.SelectMany(v => v).Count();
+                    var finalBatchViolations = violationsMap.Values.SelectMany(v => v).ToList();
+                    result.ViolationsCreated += finalBatchViolations.Count;
+                    violationsMap.Clear();
 
                     // Extract images for remaining batch
                     foreach (var sub in submissions.Where(s => string.Equals(Path.GetExtension(s.FileName), ".docx", StringComparison.OrdinalIgnoreCase)))
@@ -420,6 +454,12 @@ namespace Services.Implement
                     }
                     await _db.SaveChangesAsync(cancellationToken);
 
+                    sessionSubmissionCount = await DispatchSubmissionNotificationsAsync(
+                        session,
+                        submissions,
+                        finalBatchViolations,
+                        sessionSubmissionCount);
+
                     processedCount += submissions.Count;
                     _logger.LogInformation("Processed final batch: {Processed}/{Total} files", processedCount, docxFiles.Count);
                 }
@@ -432,6 +472,55 @@ namespace Services.Implement
                     form.Archive.FileName, form.SessionId);
                 throw new InvalidOperationException($"Failed to process nested ZIP archive: {ex.Message}", ex);
             }
+        }
+
+        private async Task<int> DispatchSubmissionNotificationsAsync(
+            ExamSession session,
+            IEnumerable<Submission> submissions,
+            IEnumerable<Violation> violations,
+            int currentSubmissionCount)
+        {
+            if (_notificationService == null)
+            {
+                return currentSubmissionCount;
+            }
+
+            var total = currentSubmissionCount;
+            var violationLookup = violations
+                .GroupBy(v => v.SubmissionId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var submission in submissions)
+            {
+                total++;
+                var uploadNotification = new SubmissionUploadedNotificationDto
+                {
+                    SubmissionId = submission.SubmissionId,
+                    SessionId = submission.SessionId,
+                    StudentId = submission.StudentId,
+                    TotalSubmissions = total
+                };
+                await _notificationService.NotifySubmissionUploadedAsync(uploadNotification, session.ExamId);
+
+                if (violationLookup.TryGetValue(submission.SubmissionId, out var submissionViolations))
+                {
+                    foreach (var violation in submissionViolations)
+                    {
+                        var violationNotification = new ViolationDetectedNotificationDto
+                        {
+                            SubmissionId = submission.SubmissionId,
+                            ViolationId = violation.ViolationId,
+                            ViolationType = violation.ViolationType.ToString(),
+                            Severity = violation.Severity.ToString(),
+                            Description = violation.Description,
+                            StudentId = submission.StudentId
+                        };
+                        await _notificationService.NotifyViolationDetectedAsync(violationNotification, session.ExamId);
+                    }
+                }
+            }
+
+            return total;
         }
 
         private Task ExtractAllNestedSolutionZipAsync(string extractDir, CancellationToken cancellationToken)
