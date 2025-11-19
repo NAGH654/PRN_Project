@@ -21,7 +21,7 @@ public class SubmissionRepository : ISubmissionRepository
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
-    public async Task<IEnumerable<Submission>> GetByStudentIdAsync(Guid studentId)
+    public async Task<IEnumerable<Submission>> GetByStudentIdAsync(string studentId)
     {
         return await _context.Submissions
             .Include(s => s.Files)
@@ -51,7 +51,7 @@ public class SubmissionRepository : ISubmissionRepository
             .ToListAsync();
     }
 
-    public async Task<Submission?> GetByStudentAndExamAsync(Guid studentId, Guid examId)
+    public async Task<Submission?> GetByStudentAndExamAsync(string studentId, Guid examId)
     {
         return await _context.Submissions
             .Include(s => s.Files)

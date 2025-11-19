@@ -1,14 +1,15 @@
 using StorageService.Entities;
+using StorageService.DTOs;
 
 namespace StorageService.Services;
 
 public interface ISubmissionService
 {
-    Task<Submission?> GetByIdAsync(Guid id);
-    Task<IEnumerable<Submission>> GetByStudentIdAsync(Guid studentId);
-    Task<IEnumerable<Submission>> GetByExamIdAsync(Guid examId);
-    Task<IEnumerable<Submission>> GetBySessionIdAsync(Guid sessionId);
-    Task<Submission> CreateSubmissionAsync(Guid studentId, Guid examId, Guid examSessionId);
-    Task<Submission> UpdateSubmissionStatusAsync(Guid id, string status, string? notes = null);
+    Task<SubmissionDto?> GetByIdAsync(Guid id);
+    Task<IEnumerable<SubmissionDto>> GetByStudentIdAsync(string studentId);
+    Task<IEnumerable<SubmissionDto>> GetByExamIdAsync(Guid examId);
+    Task<IEnumerable<SubmissionDto>> GetBySessionIdAsync(Guid sessionId);
+    Task<SubmissionDto> CreateSubmissionAsync(string studentId, Guid examId, Guid examSessionId);
+    Task<SubmissionDto> UpdateSubmissionStatusAsync(Guid id, string status, string? notes = null);
     Task<bool> DeleteAsync(Guid id);
 }

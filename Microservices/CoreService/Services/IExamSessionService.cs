@@ -1,14 +1,15 @@
 using CoreService.Entities;
+using CoreService.DTOs;
 
 namespace CoreService.Services;
 
 public interface IExamSessionService
 {
-    Task<ExamSession?> GetByIdAsync(Guid id);
-    Task<IEnumerable<ExamSession>> GetAllAsync();
-    Task<IEnumerable<ExamSession>> GetActiveAsync();
-    Task<IEnumerable<ExamSession>> GetByExamIdAsync(Guid examId);
-    Task<ExamSession> CreateAsync(ExamSession session);
-    Task<ExamSession> UpdateAsync(Guid id, ExamSession session);
+    Task<ExamSessionDto?> GetByIdAsync(Guid id);
+    Task<IEnumerable<ExamSessionDto>> GetAllAsync();
+    Task<IEnumerable<ExamSessionDto>> GetActiveAsync();
+    Task<IEnumerable<ExamSessionDto>> GetByExamIdAsync(Guid examId);
+    Task<ExamSessionDto> CreateAsync(CreateExamSessionRequest request);
+    Task<ExamSessionDto> UpdateAsync(Guid id, UpdateExamSessionRequest request);
     Task DeleteAsync(Guid id);
 }

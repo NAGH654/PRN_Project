@@ -15,6 +15,6 @@ public class ExamDto
     public string Status { get; set; } = "Draft";
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public int RubricItemsCount { get; set; }
+    public List<RubricItemDto> RubricItems { get; set; } = new List<RubricItemDto>();
     public int ExamSessionsCount { get; set; }
 }

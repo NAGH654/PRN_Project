@@ -1,5 +1,6 @@
 using CoreService.Entities;
 using CoreService.Services;
+using CoreService.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,21 +18,21 @@ public class SessionsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ExamSession>>> GetAll()
+    public async Task<ActionResult<IEnumerable<ExamSessionDto>>> GetAll()
     {
         var sessions = await _service.GetAllAsync();
         return Ok(sessions);
     }
 
     [HttpGet("active")]
-    public async Task<ActionResult<IEnumerable<ExamSession>>> GetActive()
+    public async Task<ActionResult<IEnumerable<ExamSessionDto>>> GetActive()
     {
         var sessions = await _service.GetActiveAsync();
         return Ok(sessions);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ExamSession>> GetById(Guid id)
+    public async Task<ActionResult<ExamSessionDto>> GetById(Guid id)
     {
         var session = await _service.GetByIdAsync(id);
         if (session == null)
@@ -41,18 +42,18 @@ public class SessionsController : ControllerBase
     }
 
     [HttpGet("by-exam/{examId}")]
-    public async Task<ActionResult<IEnumerable<ExamSession>>> GetByExamId(Guid examId)
+    public async Task<ActionResult<IEnumerable<ExamSessionDto>>> GetByExamId(Guid examId)
     {
         var sessions = await _service.GetByExamIdAsync(examId);
         return Ok(sessions);
     }
 
     [HttpPost]
-    public async Task<ActionResult<ExamSession>> Create([FromBody] ExamSession session)
+    public async Task<ActionResult<ExamSessionDto>> Create([FromBody] CreateExamSessionRequest request)
     {
         try
         {
-            var created = await _service.CreateAsync(session);
+            var created = await _service.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
         catch (ArgumentException ex)
@@ -62,11 +63,11 @@ public class SessionsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<ExamSession>> Update(Guid id, [FromBody] ExamSession session)
+    public async Task<ActionResult<ExamSessionDto>> Update(Guid id, [FromBody] UpdateExamSessionRequest request)
     {
         try
         {
-            var updated = await _service.UpdateAsync(id, session);
+            var updated = await _service.UpdateAsync(id, request);
             return Ok(updated);
         }
         catch (KeyNotFoundException)

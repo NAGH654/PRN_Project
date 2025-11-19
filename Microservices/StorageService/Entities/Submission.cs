@@ -9,7 +9,7 @@ public class Submission
     [Key]
     public Guid Id { get; set; }
 
-    public Guid StudentId { get; set; } // References User from IdentityService
+    public string StudentId { get; set; } = string.Empty; // Student identifier (e.g., "SE171989")
 
     public Guid ExamId { get; set; } // References Exam from CoreService
 
@@ -37,4 +37,5 @@ public class Submission
     // Navigation properties
     public ICollection<SubmissionFile> Files { get; set; } = new List<SubmissionFile>();
     public ICollection<Violation> Violations { get; set; } = new List<Violation>();
+    public ICollection<SubmissionImage> Images { get; set; } = new List<SubmissionImage>();
 }

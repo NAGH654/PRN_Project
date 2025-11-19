@@ -36,8 +36,11 @@ public class ExamService : IExamService
             .NewConfig()
             .Map(dest => dest.SubjectName, src => src.Subject != null ? src.Subject.Name : string.Empty)
             .Map(dest => dest.SemesterCode, src => src.Semester != null ? src.Semester.Code : string.Empty)
-            .Map(dest => dest.RubricItemsCount, src => src.RubricItems.Count)
+            .Map(dest => dest.RubricItems, src => src.RubricItems.Adapt<List<RubricItemDto>>())
             .Map(dest => dest.ExamSessionsCount, src => src.ExamSessions.Count);
+
+        TypeAdapterConfig<RubricItem, RubricItemDto>
+            .NewConfig();
     }
 
     public async Task<ExamDto?> GetByIdAsync(Guid id)
@@ -64,7 +67,7 @@ public class ExamService : IExamService
         return exams.Adapt<IEnumerable<ExamDto>>();
     }
 
-    public async Task<Exam> CreateAsync(string title, string? description, Guid subjectId, Guid semesterId, DateTime examDate, int durationMinutes, decimal totalMarks)
+    public async Task<ExamDto> CreateAsync(string title, string? description, Guid subjectId, Guid semesterId, DateTime examDate, int durationMinutes, decimal totalMarks)
     {
         // Check for duplicate title
         if (await _examRepository.TitleExistsAsync(title))
@@ -107,11 +110,11 @@ public class ExamService : IExamService
 
         var created = await _examRepository.CreateAsync(exam);
         _logger.LogInformation("Exam {Title} created successfully", title);
-        
-        return created;
+
+        return created.Adapt<ExamDto>();
     }
 
-    public async Task<Exam> UpdateAsync(Guid id, string title, string? description, Guid subjectId, Guid semesterId, DateTime examDate, int durationMinutes, decimal totalMarks)
+    public async Task<ExamDto> UpdateAsync(Guid id, string title, string? description, Guid subjectId, Guid semesterId, DateTime examDate, int durationMinutes, decimal totalMarks)
     {
         var exam = await _examRepository.GetByIdAsync(id);
         if (exam == null)
@@ -167,8 +170,8 @@ public class ExamService : IExamService
 
         var updated = await _examRepository.UpdateAsync(exam);
         _logger.LogInformation("Exam {Id} updated successfully", id);
-        
-        return updated;
+
+        return updated.Adapt<ExamDto>();
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -187,7 +190,7 @@ public class ExamService : IExamService
     }
 
     // Rubric Management
-    public async Task<RubricItem> AddRubricItemAsync(Guid examId, string criteria, string? description, decimal maxPoints)
+    public async Task<RubricItemDto> AddRubricItemAsync(Guid examId, string criteria, string? description, decimal maxPoints)
     {
         var exam = await _examRepository.GetByIdAsync(examId);
         if (exam == null)
@@ -203,6 +206,13 @@ public class ExamService : IExamService
         // Get next display order
         var existingRubrics = exam.RubricItems;
         var nextOrder = existingRubrics.Any() ? existingRubrics.Max(r => r.DisplayOrder) + 1 : 1;
+
+        // Validate that adding this rubric won't exceed exam total marks
+        var currentTotalRubricPoints = existingRubrics.Sum(r => r.MaxPoints);
+        if (currentTotalRubricPoints + maxPoints > exam.TotalMarks)
+        {
+            throw new InvalidOperationException($"Adding this rubric would exceed the exam's total marks. Current total: {currentTotalRubricPoints}, Adding: {maxPoints}, Exam total: {exam.TotalMarks}");
+        }
 
         var rubricItem = new RubricItem
         {
@@ -220,7 +230,103 @@ public class ExamService : IExamService
         await _examRepository.UpdateAsync(exam);
         _logger.LogInformation("Rubric item '{Criteria}' added to exam {ExamId}", criteria, examId);
 
-        return rubricItem;
+        return rubricItem.Adapt<RubricItemDto>();
+    }
+
+    public async Task<RubricItemDto> UpdateRubricItemAsync(Guid examId, Guid rubricItemId, string criteria, string? description, decimal maxPoints)
+    {
+        var exam = await _examRepository.GetByIdAsync(examId);
+        if (exam == null)
+        {
+            throw new KeyNotFoundException($"Exam with ID {examId} not found");
+        }
+
+        if (exam.Status != "Draft")
+        {
+            throw new InvalidOperationException("Cannot modify rubrics for non-draft exams");
+        }
+
+        var rubricItem = exam.RubricItems.FirstOrDefault(r => r.Id == rubricItemId);
+        if (rubricItem == null)
+        {
+            throw new KeyNotFoundException($"Rubric item with ID {rubricItemId} not found in exam {examId}");
+        }
+
+        // Calculate new total: current total - old maxPoints + new maxPoints
+        var currentTotalRubricPoints = exam.RubricItems.Sum(r => r.MaxPoints);
+        var newTotalRubricPoints = currentTotalRubricPoints - rubricItem.MaxPoints + maxPoints;
+
+        // Validate that the new total won't exceed exam total marks
+        if (newTotalRubricPoints > exam.TotalMarks)
+        {
+            throw new InvalidOperationException($"Updating this rubric would exceed the exam's total marks. New total: {newTotalRubricPoints}, Exam total: {exam.TotalMarks}");
+        }
+
+        // Update the rubric item
+        rubricItem.Criteria = criteria;
+        rubricItem.Description = description;
+        rubricItem.MaxPoints = maxPoints;
+
+        await _examRepository.UpdateAsync(exam);
+        _logger.LogInformation("Rubric item {RubricItemId} updated in exam {ExamId}", rubricItemId, examId);
+
+        return rubricItem.Adapt<RubricItemDto>();
+    }
+
+    public async Task<IEnumerable<RubricItemDto>> AddRubricItemsAsync(Guid examId, IEnumerable<(string Criteria, string? Description, decimal MaxPoints)> rubricItems)
+    {
+        var exam = await _examRepository.GetByIdAsync(examId);
+        if (exam == null)
+        {
+            throw new KeyNotFoundException($"Exam with ID {examId} not found");
+        }
+
+        if (exam.Status != "Draft")
+        {
+            throw new InvalidOperationException("Cannot modify rubrics for non-draft exams");
+        }
+
+        var rubricItemList = rubricItems.ToList();
+        if (!rubricItemList.Any())
+        {
+            throw new ArgumentException("At least one rubric item must be provided", nameof(rubricItems));
+        }
+
+        // Get next display order
+        var existingRubrics = exam.RubricItems;
+        var nextOrder = existingRubrics.Any() ? existingRubrics.Max(r => r.DisplayOrder) + 1 : 1;
+
+        // Calculate total points that would be added
+        var totalPointsToAdd = rubricItemList.Sum(r => r.MaxPoints);
+
+        // Validate that adding all rubrics won't exceed exam total marks
+        var currentTotalRubricPoints = existingRubrics.Sum(r => r.MaxPoints);
+        if (currentTotalRubricPoints + totalPointsToAdd > exam.TotalMarks)
+        {
+            throw new InvalidOperationException($"Adding these rubrics would exceed the exam's total marks. Current total: {currentTotalRubricPoints}, Adding: {totalPointsToAdd}, Exam total: {exam.TotalMarks}");
+        }
+
+        var addedRubrics = new List<RubricItem>();
+
+        foreach (var (criteria, description, maxPoints) in rubricItemList)
+        {
+            var rubricItem = new RubricItem
+            {
+                ExamId = examId,
+                Criteria = criteria,
+                Description = description,
+                MaxPoints = maxPoints,
+                DisplayOrder = nextOrder++
+            };
+
+            exam.RubricItems.Add(rubricItem);
+            addedRubrics.Add(rubricItem);
+        }
+
+        await _examRepository.UpdateAsync(exam);
+        _logger.LogInformation("Added {Count} rubric items to exam {ExamId}", rubricItemList.Count, examId);
+
+        return addedRubrics.Select(r => r.Adapt<RubricItemDto>());
     }
 
     public async Task<bool> RemoveRubricItemAsync(Guid examId, Guid rubricItemId)
@@ -249,7 +355,7 @@ public class ExamService : IExamService
         return true;
     }
 
-    public async Task<Exam> PublishExamAsync(Guid examId)
+    public async Task<ExamDto> PublishExamAsync(Guid examId)
     {
         var exam = await _examRepository.GetByIdAsync(examId);
         if (exam == null)
@@ -295,7 +401,7 @@ public class ExamService : IExamService
         var updated = await _examRepository.UpdateAsync(exam);
         _logger.LogInformation("Exam {ExamId} published successfully", examId);
 
-        return updated;
+        return updated.Adapt<ExamDto>();
     }
 
     // Examiner Assignment

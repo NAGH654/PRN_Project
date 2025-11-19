@@ -16,6 +16,8 @@ public class ExamRepository : IExamRepository
     public async Task<Exam?> GetByIdAsync(Guid id)
     {
         return await _context.Exams
+            .Include(e => e.Subject)
+            .Include(e => e.Semester)
             .Include(e => e.RubricItems)
             .Include(e => e.ExamSessions)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -36,6 +38,10 @@ public class ExamRepository : IExamRepository
     public async Task<IEnumerable<Exam>> GetBySubjectIdAsync(Guid subjectId)
     {
         return await _context.Exams
+            .Include(e => e.Subject)
+            .Include(e => e.Semester)
+            .Include(e => e.RubricItems)
+            .Include(e => e.ExamSessions)
             .Where(e => e.SubjectId == subjectId)
             .OrderByDescending(e => e.ExamDate)
             .ToListAsync();
@@ -44,6 +50,10 @@ public class ExamRepository : IExamRepository
     public async Task<IEnumerable<Exam>> GetBySemesterIdAsync(Guid semesterId)
     {
         return await _context.Exams
+            .Include(e => e.Subject)
+            .Include(e => e.Semester)
+            .Include(e => e.RubricItems)
+            .Include(e => e.ExamSessions)
             .Where(e => e.SemesterId == semesterId)
             .OrderByDescending(e => e.ExamDate)
             .ToListAsync();
