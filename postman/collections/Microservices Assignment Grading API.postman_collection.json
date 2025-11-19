@@ -1,0 +1,1760 @@
+{
+  "info": {
+    "_postman_id": "c405a551-a3e2-493e-89fa-18422d94ab25",
+    "name": "Microservices Assignment Grading API",
+    "description": "Complete API collection for testing all microservices endpoints through the Gateway. Includes Use Case 1: Exam Setup & Management with rubric management and examiner assignment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "47478010",
+    "_collection_link": "https://khoipmse171989-4874211.postman.co/workspace/ded9198f-8d52-4cba-88f7-cc6b89100a60/collection/47478010-c405a551-a3e2-493e-89fa-18422d94ab25?action=share&source=collection_link&creator=47478010"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "id": "0f52b751-9477-4c1c-a2ad-9560bb77b457",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"role\": \"Admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set(\"token\", jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "id": "75e4ae9c-8bb0-4b14-8723-919cb5776d47"
+              }
+            }
+          ],
+          "id": "e398fd23-c94e-49c5-a5f0-083edd11d1e2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Test123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "id": "634f3dc8-d31e-4b0c-9bef-3abf33facabc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your-refresh-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "3e5762d0-731a-4651-91d6-0d442cc0f6c7"
+    },
+    {
+      "name": "Subjects",
+      "item": [
+        {
+          "name": "Get All Subjects",
+          "id": "61e90cab-c077-4efe-a419-88b546bab418",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subjects",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subjects"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subject By ID",
+          "id": "c161bdc1-b9cd-4b56-ad4c-50ceed493f00",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subjects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subjects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{subjectId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subject",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "79dffed1-148f-4968-8495-b012a4461dfe",
+                "exec": [
+                  "// Tests for Create Subject",
+                  "// Treat 200 and 201 as success. Parse JSON, assert required fields, and persist id to environment.",
+                  "",
+                  "(function () {",
+                  "  const successStatuses = [200, 201];",
+                  "",
+                  "  // Status code expectations",
+                  "  pm.test(\"Status is 200 or 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf(successStatuses);",
+                  "  });",
+                  "",
+                  "  // Content-Type header presence",
+                  "  pm.test(\"Has Content-Type header\", function () {",
+                  "    pm.response.to.have.header(\"Content-Type\");",
+                  "  });",
+                  "",
+                  "  // Attempt to parse JSON and perform schema-like checks",
+                  "  let bodyJson;",
+                  "  pm.test(\"Response is valid JSON\", function () {",
+                  "    bodyJson = pm.response.json();",
+                  "    pm.expect(bodyJson).to.be.an(\"object\");",
+                  "  });",
+                  "",
+                  "  if (typeof bodyJson === \"object\" && bodyJson !== null) {",
+                  "    pm.test(\"Has required fields\", function () {",
+                  "      const required = [\"id\", \"code\", \"name\", \"description\", \"credits\"];",
+                  "      required.forEach(function (key) {",
+                  "        pm.expect(bodyJson).to.have.property(key);",
+                  "      });",
+                  "    });",
+                  "",
+                  "    pm.test(\"Field types are correct\", function () {",
+                  "      pm.expect(bodyJson.id).to.be.a(\"string\");",
+                  "      pm.expect(bodyJson.code).to.be.a(\"string\");",
+                  "      pm.expect(bodyJson.name).to.be.a(\"string\");",
+                  "      pm.expect(bodyJson.description).to.be.a(\"string\");",
+                  "      pm.expect(bodyJson.credits).to.satisfy(function (v) { return typeof v === \"number\" && !isNaN(v); });",
+                  "    });",
+                  "",
+                  "    // Save id to environment for chaining",
+                  "    pm.test(\"Save subjectId to environment\", function () {",
+                  "      pm.environment.set(\"subjectId\", String(bodyJson.id));",
+                  "      pm.expect(pm.environment.get(\"subjectId\")).to.eql(String(bodyJson.id));",
+                  "    });",
+                  "  }",
+                  "",
+                  "  // Negative-path/defensive assertions",
+                  "  pm.test(\"No error property present\", function () {",
+                  "    const txt = pm.response.text();",
+                  "    pm.expect(txt.toLowerCase()).to.not.include(\"error\");",
+                  "  });",
+                  "",
+                  "  pm.test(\"Response time under 2s\", function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "  });",
+                  "",
+                  "  // Optional: ensure non-empty strings for main fields",
+                  "  pm.test(\"Core string fields are non-empty\", function () {",
+                  "    try {",
+                  "      const j = bodyJson || pm.response.json();",
+                  "      [\"code\", \"name\", \"description\"].forEach(function (k) {",
+                  "        pm.expect(j[k]).to.be.a(\"string\").and.to.have.length.above(0);",
+                  "      });",
+                  "    } catch (e) {",
+                  "      // If parsing failed, this test will naturally fail above; do nothing here",
+                  "    }",
+                  "  });",
+                  "})();"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "id": "3ff3f4b0-f357-462f-a0e8-7d509881b5e8",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SWD392\",\n  \"name\": \"Software Design\",\n  \"description\": \"Introduction to Computer Science\",\n  \"credits\": 3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subjects",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subjects"
+              ]
+            }
+          },
+          "response": [
+            {
+              "id": "18d85b8c-35b3-41fa-a127-200c11abda73",
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"SWD392\",\n  \"name\": \"Software Design\",\n  \"description\": \"Introduction to Computer Science\",\n  \"credits\": 3\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/subjects",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "subjects"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 18 Nov 2025 12:09:13 GMT"
+                },
+                {
+                  "key": "Server",
+                  "value": "Kestrel"
+                },
+                {
+                  "key": "Location",
+                  "value": "http://core-service/api/Subjects/8cc21c5e-9c34-41ee-8857-c736224571ad"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"8cc21c5e-9c34-41ee-8857-c736224571ad\",\n    \"code\": \"SWD392\",\n    \"name\": \"Software Design\",\n    \"description\": \"Introduction to Computer Science\",\n    \"credits\": 3,\n    \"createdAt\": \"2025-11-18T12:09:14.4104208Z\",\n    \"updatedAt\": null,\n    \"exams\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Subject",
+          "id": "b8668657-56de-4377-888d-617bd3c2dadb",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CS101\",\n  \"name\": \"Computer Science Updated\",\n  \"description\": \"Advanced Computer Science\",\n  \"credits\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subjects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subjects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Subject",
+          "id": "d70f5bdf-9a4d-4135-b168-e953b754551b",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subjects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subjects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "bbf5294f-a0ca-403a-b5fe-34445f4eada7"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "1e2f89a1-c688-4d81-8da0-437c5e9e83ee"
+    },
+    {
+      "name": "Semesters",
+      "item": [
+        {
+          "name": "Get All Semesters",
+          "id": "a420d5fc-6532-4c4f-9e88-29cc17fd96cd",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Semester By ID",
+          "id": "ae248278-923f-48e3-afa5-0921260f5e57",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Semester",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "e3365aba-524b-4683-b3af-7befa0971a2f",
+                "exec": [
+                  "// Assert status is 201 or 200",
+                  "pm.test(\"Status code is 201 or 200\", function () {",
+                  "  pm.expect(pm.response.code, \"Expected 200 or 201\").to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "// Try parsing JSON safely",
+                  "let json = null;",
+                  "let isJson = false;",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "  isJson = true;",
+                  "} catch (e) {",
+                  "  isJson = false;",
+                  "}",
+                  "",
+                  "// Handle non-JSON responses gracefully",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "  pm.expect(isJson, \"Response should be JSON for Create Semester\").to.be.true;",
+                  "});",
+                  "",
+                  "// Only run JSON-based assertions if parse succeeded",
+                  "if (isJson && json) {",
+                  "  pm.test(\"Response has a non-empty string id\", function () {",
+                  "    pm.expect(json).to.have.property(\"id\");",
+                  "    pm.expect(json.id, \"id should be a non-empty string\").to.be.a(\"string\").and.not.empty;",
+                  "  });",
+                  "",
+                  "  // Set environment variable if id exists",
+                  "  if (typeof json.id === \"string\" && json.id.length > 0) {",
+                  "    pm.environment.set(\"semesterId\", json.id);",
+                  "    console.log(\"semesterId set to:\", json.id);",
+                  "  }",
+                  "}",
+                  "",
+                  "// Helpful logging",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  if (isJson && json && typeof json.id === \"string\" && json.id.length > 0) {",
+                  "    console.log(\"Create Semester success: status\", pm.response.code, \"id:\", json.id);",
+                  "  } else {",
+                  "    console.warn(\"Create Semester received valid status\", pm.response.code, \"but response is not valid JSON or missing id field\");",
+                  "  }",
+                  "} else {",
+                  "  console.error(\"Create Semester failed: status\", pm.response.code, \"body:\", pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "id": "c334148e-efa7-46f8-985d-01d78bfccd8d",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"FALL25\",\n  \"startDate\": \"2025-09-01T00:00:00Z\",\n  \"endDate\": \"2025-12-31T23:59:59Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Semester",
+          "id": "2dce27ab-55bb-449c-b28f-27d09c95dfd7",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Spring 2025\",\n  \"startDate\": \"2025-01-01T00:00:00Z\",\n  \"endDate\": \"2025-05-31T23:59:59Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Semester",
+          "id": "be67333f-ed99-48ae-876c-3e18904df747",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "7b803c66-c640-4688-0882-08de26b0f92c"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "3ed6bc09-84b5-4633-897d-b667a6c6ab89"
+    },
+    {
+      "name": "Exams",
+      "item": [
+        {
+          "name": "Get All Exams",
+          "id": "9e7aac10-77f1-4b2c-b0cb-ad43c34c9d9b",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Exam By ID",
+          "id": "c095237f-58f9-47d7-9535-1c121780aa91",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Exam",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "c93040b6-13ad-40f7-ab8f-a354f6d35054",
+                "exec": [
+                  "pm.test(\"Capture examId from create response\", function () {\r",
+                  "  pm.response.to.have.status(201);\r",
+                  "\r",
+                  "  const json = pm.response.json();\r",
+                  "  pm.expect(json).to.have.property(\"id\");\r",
+                  "\r",
+                  "  // Save to environment if available, else fall back to collection variable\r",
+                  "  if (pm.environment.name) {\r",
+                  "    pm.environment.set(\"examId\", json.id);\r",
+                  "  } else {\r",
+                  "    pm.collectionVariables.set(\"examId\", json.id);\r",
+                  "  }\r",
+                  "\r",
+                  "  // Optional: surface it in the console\r",
+                  "  console.log(\"examId set to:\", json.id);\r",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "id": "acd1c8ba-8af4-41d5-9aa5-f74bcfad17a1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"SWD392_SU25_PE_2ndFE_Block10w\",\n  \"description\": \"SWD392 FinalExam\",\n  \"subjectId\": \"{{subjectId}}\",\n  \"semesterId\": \"{{semesterId}}\",\n  \"examDate\": \"2025-12-01T09:00:00Z\",\n  \"durationMinutes\": 120,\n  \"totalMarks\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams"
+              ]
+            },
+            "description": "Create a new exam in draft status with validation"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Exam",
+          "id": "45ce582c-1cb6-41a7-9101-85ad175a4af3",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Final Exam\",\n  \"description\": \"CS101 Final\",\n  \"subjectId\": \"00000000-0000-0000-0000-000000000001\",\n  \"semesterId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examDate\": \"2025-12-15T09:00:00Z\",\n  \"durationMinutes\": 180,\n  \"totalMarks\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            },
+            "description": "Update an exam (draft status only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Exam",
+          "id": "ddfb0131-431e-4828-be68-64337590cb4e",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            },
+            "description": "Delete an exam (draft status only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Rubric Item",
+          "id": "045ffc70-4cc2-4edc-aad8-d1891daa426a",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"criteria\": \"Code Quality\",\n  \"description\": \"Evaluate code structure, comments, and best practices\",\n  \"maxPoints\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId/rubrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":examId",
+                "rubrics"
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            },
+            "description": "Add a rubric item to an exam (draft status only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Rubric Item",
+          "id": "ee04d51f-63be-44c7-af29-2aac68864c1f",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:examId/rubrics/:rubricItemId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":examId",
+                "rubrics",
+                ":rubricItemId"
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                },
+                {
+                  "key": "rubricItemId",
+                  "value": "00000000-0000-0000-0000-000000000002"
+                }
+              ]
+            },
+            "description": "Remove a rubric item from an exam (draft status only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Publish Exam",
+          "id": "1c3f6ec8-383e-4011-a2fe-fc7145867012",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/:id/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                ":id",
+                "publish"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            },
+            "description": "Publish a draft exam to Active status (creates exam session automatically)"
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Examiner",
+          "id": "9777134a-2cc8-46a5-9c1d-d663ea751a0d",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examinerId\": \"00000000-0000-0000-0000-000000000003\",\n  \"role\": \"Examiner\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/sessions/:sessionId/examiners",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                "sessions",
+                ":sessionId",
+                "examiners"
+              ],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            },
+            "description": "Assign an examiner to an exam session (max 5 examiners)"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Examiner Assignment",
+          "id": "ceb24949-1bd1-45bb-bd76-0af8b8dcccee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/exams/sessions/:sessionId/examiners/:examinerId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "exams",
+                "sessions",
+                ":sessionId",
+                "examiners",
+                ":examinerId"
+              ],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                },
+                {
+                  "key": "examinerId",
+                  "value": "00000000-0000-0000-0000-000000000003"
+                }
+              ]
+            },
+            "description": "Remove an examiner assignment from an exam session"
+          },
+          "response": []
+        }
+      ],
+      "id": "3c2e802d-3d7c-4645-a7c6-13a57dd3fc68"
+    },
+    {
+      "name": "Grades",
+      "item": [
+        {
+          "name": "Get All Grades",
+          "id": "6e2b455c-6810-4725-8166-82e3b3c0618d",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Grade By ID",
+          "id": "955d6e9c-b770-4aec-adae-1d2b3a4878e3",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Grades By Student",
+          "id": "3ed86a70-ce1b-4b87-95ed-ef29683b3eea",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/student/:studentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                "student",
+                ":studentId"
+              ],
+              "variable": [
+                {
+                  "key": "studentId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Grades By Exam",
+          "id": "a7fcc31a-9f71-45b0-9652-ca2faac19ed8",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/exam/:examId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                "exam",
+                ":examId"
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Grade",
+          "id": "24882125-82e2-40ae-8964-52a73d209df7",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"score\": 85.5,\n  \"feedback\": \"Good work\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Grade",
+          "id": "58dcb3f3-59c3-498d-aa8e-67091ec3365f",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 90.0,\n  \"feedback\": \"Excellent work\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Grade",
+          "id": "2a2cac81-e906-4187-a98d-e5ff1cd742db",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "2c7b5b2c-ebf8-4430-8601-f595c9ca873b"
+    },
+    {
+      "name": "Sessions",
+      "item": [
+        {
+          "name": "Get All Sessions",
+          "id": "ef4c27e0-476e-4569-9f92-5fb1d4a6d810",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Sessions",
+          "id": "85ef23b3-22a7-49db-b9f0-0bd96419608b",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "active"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session By ID",
+          "id": "3d05e73e-395d-4d20-ab53-72bcda7f8ebb",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sessions By Exam",
+          "id": "fda56fb0-e990-4d72-87d3-c4a32bdccbf0",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/by-exam/:examId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "by-exam",
+                ":examId"
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Session",
+          "id": "3a03bbaa-36d2-4c4f-b999-25376540d0f5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"sessionName\": \"Morning Session\",\n  \"scheduledDate\": \"2025-12-01T09:00:00Z\",\n  \"location\": \"Room 101\",\n  \"maxStudents\": 50,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Session",
+          "id": "b7c6b478-c62a-44e0-ad73-8609d7863001",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"sessionName\": \"Afternoon Session\",\n  \"scheduledDate\": \"2025-12-01T14:00:00Z\",\n  \"location\": \"Room 102\",\n  \"maxStudents\": 60,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Session",
+          "id": "a4bead97-d544-4e80-bc7a-9f417c244429",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "a97e55ef-3210-47c3-b9a4-784cd6259931"
+    },
+    {
+      "name": "Submissions",
+      "item": [
+        {
+          "name": "Get Submission By ID",
+          "id": "29ae4960-37c8-4888-aeda-55b1c5f3e3b5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submissions By Student",
+          "id": "edc95494-f2d8-480d-86ea-8eda2ce16d95",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/by-student/:studentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                "by-student",
+                ":studentId"
+              ],
+              "variable": [
+                {
+                  "key": "studentId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submissions By Exam",
+          "id": "90754ae1-f4ab-4d5c-942a-40f08ab851d7",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/by-exam/:examId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                "by-exam",
+                ":examId"
+              ],
+              "variable": [
+                {
+                  "key": "examId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submissions By Session",
+          "id": "b9ab957e-d2f0-4ecf-b779-884b3d23d24f",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/by-session/:sessionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                "by-session",
+                ":sessionId"
+              ],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submission Text",
+          "id": "2544b2f4-f892-42e0-85f8-d9fff7deb883",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/:id/text",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                ":id",
+                "text"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Submission",
+          "id": "011ce99e-9003-4db8-a57a-14f1fc48e825",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examId\": \"00000000-0000-0000-0000-000000000001\",\n  \"examSessionId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Submission Status",
+          "id": "1b601488-b6ad-4c15-853d-cea797ea4e05",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Completed\",\n  \"notes\": \"Processing finished successfully\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Submission",
+          "id": "59bc9099-07bd-4ad6-80e3-1cd4aaeb2c15",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "ebd06f73-05cd-4448-afb3-bd863efd7dd0"
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload Nested ZIP",
+          "id": "058b5bb5-a49b-40e5-b06c-62b3832f1cc6",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "SessionId",
+                  "value": "00000000-0000-0000-0000-000000000001",
+                  "type": "text"
+                },
+                {
+                  "key": "Archive",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nestedzip/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nestedzip",
+                "upload"
+              ]
+            },
+            "description": "Upload a nested ZIP archive for processing. Archive can be up to 600MB."
+          },
+          "response": []
+        },
+        {
+          "name": "Get File",
+          "id": "554a2df8-e1a1-4613-b4f1-27577b1008e1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/files/:path",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "files",
+                ":path"
+              ],
+              "variable": [
+                {
+                  "key": "path",
+                  "value": "uploads/file.docx"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "f9f496d8-5196-485f-b16c-fdd10b254cf7"
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Get Exam Reports",
+          "id": "0b78c140-8c91-4749-9485-bb381e374b0c",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/exams?subjectId=&fromDate=&toDate=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "exams"
+              ],
+              "query": [
+                {
+                  "key": "subjectId",
+                  "value": ""
+                },
+                {
+                  "key": "fromDate",
+                  "value": ""
+                },
+                {
+                  "key": "toDate",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "ed2aca2d-095f-4e52-9eee-897684be4a6f"
+    },
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Gateway Health",
+          "id": "e4ebe953-64cd-4bc3-a8aa-3d1e6c05c9ee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submissions Service Health",
+          "id": "e6ab086b-37d4-422a-9e5c-fc8ba456c791",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/submissions/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "submissions",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "401497f3-4825-48fc-8b90-231270e4281a"
+    }
+  ],
+  "variable": [
+    {
+      "id": "2421c2ad-fc56-4a7d-962b-573605bed72e",
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "id": "e6a65c7d-1517-475b-b54d-f6f6bbebecbd",
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

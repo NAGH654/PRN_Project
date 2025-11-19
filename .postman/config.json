@@ -1,0 +1,14 @@
+{
+  "workspace": {
+    "id": ""
+  },
+  "entities": {
+    "collections": [
+      "..\\postman\\collections\\Microservices Assignment Grading API.postman_collection.json"
+    ],
+    "environments": [],
+    "specs": [],
+    "flows": [],
+    "globals": []
+  }
+}

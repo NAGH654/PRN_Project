@@ -1,0 +1,194 @@
+# Simplified 3-Microservice Architecture
+# This runs 3 microservices using SHARED database with separate schemas
+
+services:
+  # ========================================
+  # SQL Server - SHARED DATABASE
+  # ========================================
+  assignment_grading_db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: assignment_grading_db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - app-network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ========================================
+  # API GATEWAY - Single Entry Point (YARP)
+  # ========================================
+  gateway:
+    build:
+      context: .
+      dockerfile: Microservices/Gateway/Dockerfile
+    container_name: api_gateway
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Jwt__SecretKey=YourSuperSecretKeyForJwtTokenGeneration123456
+      - Jwt__Issuer=AssignmentGradingSystem
+      - Jwt__Audience=AssignmentGradingUsers
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+      storage-service:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # MONOLITH API (Legacy - Optional)
+  # ========================================
+  # Uncomment if you want to run monolith alongside microservices
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: assignment_grading_api_monolith
+  #   ports:
+  #     - "5000:8080"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ASPNETCORE_URLS=http://+:8080
+  #     - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+  #   depends_on:
+  #     assignment_grading_db:
+  #       condition: service_healthy
+  #   networks:
+  #     - app-network
+  #   volumes:
+  #     - ./API/storage:/app/storage
+
+  # ========================================
+  # MICROSERVICE 1: Identity Service (Authentication)
+  # ========================================
+  identity-service:
+    build:
+      context: .
+      dockerfile: Microservices/IdentityService/Dockerfile
+    container_name: identity_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5001:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Authentication__Key=ThisIsAVerySecureKeyForJWTAuthenticationWithAtLeast32Characters!
+      - Authentication__Issuer=AssignmentGradingAPI
+      - Authentication__Audience=AssignmentGradingUsers
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/auth/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # MICROSERVICE 2: Core Service (Exams & Grading)
+  # ========================================
+  core-service:
+    build:
+      context: .
+      dockerfile: Microservices/CoreService/Dockerfile
+    container_name: core_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Jwt__SecretKey=YourSuperSecretKeyForJwtTokenGeneration123456
+      - Jwt__Issuer=AssignmentGradingSystem
+      - Jwt__Audience=AssignmentGradingUsers
+      - Services__IdentityService=http://identity-service:80
+      - Services__StorageService=http://storage-service:80
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # MICROSERVICE 3: Storage Service (File Processing)
+  # ========================================
+  storage-service:
+    build:
+      context: .
+      dockerfile: Microservices/StorageService/Dockerfile
+    container_name: storage_service
+    # Uncomment for direct Swagger access during development
+    # ports:
+    #   - "5003:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=assignment_grading_db;Database=AssignmentGradingDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Jwt__SecretKey=YourSuperSecretKeyForJwtTokenGeneration123456
+      - Jwt__Issuer=AssignmentGradingSystem
+      - Jwt__Audience=AssignmentGradingUsers
+      - Services__IdentityService=http://identity-service:80
+      - Services__CoreService=http://core-service:80
+      - Storage__Path=/app/storage
+    depends_on:
+      assignment_grading_db:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - storage_files:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/submissions/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  sqlserver_data:
+  storage_files:
+
+networks:
+  app-network:
+    driver: bridge
