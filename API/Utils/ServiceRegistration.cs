@@ -23,6 +23,7 @@ namespace API.Utils
             services.AddScoped<ISessionQueryService, SessionQueryService>();
             services.AddScoped<IReportService, ReportService>();
             services.AddScoped<ISubmissionQueryService, SubmissionQueryService>();
+            services.AddScoped<IGradingService, GradingService>();
 
             return services;
         }
