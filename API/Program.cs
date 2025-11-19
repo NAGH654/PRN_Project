@@ -1,9 +1,12 @@
-﻿using API.Middlewares;
+﻿using API.Hubs;
+using API.Middlewares;
+using API.Services;
 using API.Utils;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.OData;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Services.Dtos;
+using Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,8 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddServices(builder.Configuration);
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Services.AddControllers(options =>
     {
@@ -68,6 +73,9 @@ if (app.Environment.IsDevelopment())
 // Enable CORS
 app.UseCors("AllowReactApp");
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Serve storage as static files at /files
 var storageOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<StorageOptions>>().Value;
 var storageRoot = Path.Combine(AppContext.BaseDirectory, storageOptions.Root);
@@ -78,4 +86,5 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/files"
 });
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.Run();
