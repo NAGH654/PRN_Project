@@ -4,6 +4,7 @@ using StorageService.Repositories;
 using StorageService.Services;
 using Shared.Middleware;
 using Shared.Extensions;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,6 +91,24 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseMiddleware<JwtMiddleware>();
+
+// Serve static files from storage directory
+var storagePath = app.Configuration["Storage:Path"] 
+    ?? app.Configuration["Storage__Path"]
+    ?? "/app/storage";
+if (Directory.Exists(storagePath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(storagePath),
+        RequestPath = "/files"
+    });
+    app.Logger.LogInformation("Static files enabled from: {StoragePath}", storagePath);
+}
+else
+{
+    app.Logger.LogWarning("Storage path does not exist: {StoragePath}", storagePath);
+}
 
 app.MapControllers();
 app.MapHealthChecks("/health");

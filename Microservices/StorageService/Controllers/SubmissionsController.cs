@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StorageService.Services;
 using StorageService.Models;
 using StorageService.DTOs;
+using StorageService.Data;
 
 namespace StorageService.Controllers;
 
@@ -11,6 +13,8 @@ public class SubmissionsController : ControllerBase
 {
     private readonly ISubmissionService _submissionService;
     private readonly ITextExtractionService _textExtractionService;
+    private readonly INestedZipService _nestedZipService;
+    private readonly StorageDbContext _context;
     private readonly ILogger<SubmissionsController> _logger;
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
@@ -18,12 +22,16 @@ public class SubmissionsController : ControllerBase
     public SubmissionsController(
         ISubmissionService submissionService,
         ITextExtractionService textExtractionService,
+        INestedZipService nestedZipService,
+        StorageDbContext context,
         ILogger<SubmissionsController> logger,
         HttpClient httpClient,
         IConfiguration configuration)
     {
         _submissionService = submissionService;
         _textExtractionService = textExtractionService;
+        _nestedZipService = nestedZipService;
+        _context = context;
         _logger = logger;
         _httpClient = httpClient;
         _configuration = configuration;
@@ -183,6 +191,125 @@ public class SubmissionsController : ControllerBase
         }
     }
 
+    [HttpGet("session/{sessionId:guid}/students")]
+    public async Task<IActionResult> GetSessionStudents(Guid sessionId)
+    {
+        try
+        {
+            var submissions = await _submissionService.GetBySessionIdAsync(sessionId);
+            var students = submissions.Select(s => new
+            {
+                SubmissionId = s.Id,
+                StudentId = s.StudentId,
+                StudentName = (string?)null, // TODO: Get from User table if needed
+                FileName = $"submission_{s.Id}.zip", // TODO: Get actual filename if stored
+                SubmissionTime = s.SubmittedAt
+            }).ToList();
+            return Ok(students);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting students for session {SessionId}", sessionId);
+            return StatusCode(500, new { message = "An error occurred while retrieving session students" });
+        }
+    }
+
+    [HttpDelete("cleanup/all")]
+    public async Task<IActionResult> DeleteAllSubmissions(CancellationToken ct)
+    {
+        try
+        {
+            // Delete in correct order to avoid foreign key violations
+            var imagesCount = await _context.SubmissionImages.CountAsync(ct);
+            var violationsCount = await _context.Violations.CountAsync(ct);
+            var filesCount = await _context.SubmissionFiles.CountAsync(ct);
+            var submissionsCount = await _context.Submissions.CountAsync(ct);
+
+            _context.SubmissionImages.RemoveRange(_context.SubmissionImages);
+            _context.Violations.RemoveRange(_context.Violations);
+            _context.SubmissionFiles.RemoveRange(_context.SubmissionFiles);
+            _context.Submissions.RemoveRange(_context.Submissions);
+
+            await _context.SaveChangesAsync(ct);
+
+            return Ok(new
+            {
+                message = "All submissions deleted successfully",
+                deleted = new
+                {
+                    submissions = submissionsCount,
+                    files = filesCount,
+                    images = imagesCount,
+                    violations = violationsCount
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting all submissions");
+            return StatusCode(500, new { message = "An error occurred while deleting submissions", detail = ex.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/images")]
+    public async Task<IActionResult> GetImages(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var submission = await _submissionService.GetByIdAsync(id);
+            if (submission == null)
+                return NotFound(new { message = $"Submission with ID {id} not found" });
+
+            // Get images from database
+            var images = await _context.SubmissionImages
+                .Where(img => img.SubmissionId == id)
+                .Select(img => new
+                {
+                    ImageId = img.Id,
+                    ImageName = img.ImageName,
+                    RelativePath = img.ImagePath,
+                    ImageSize = img.ImageSizeBytes
+                })
+                .ToListAsync(ct);
+
+            // Build absolute URLs through Gateway
+            // Check for X-Forwarded-Host header (set by Gateway)
+            var forwardedHost = Request.Headers["X-Forwarded-Host"].FirstOrDefault();
+            var forwardedProto = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? "http";
+            
+            string baseUrl;
+            if (!string.IsNullOrEmpty(forwardedHost))
+            {
+                // Use Gateway host from forwarded header
+                baseUrl = $"{forwardedProto}://{forwardedHost}";
+            }
+            else
+            {
+                // Fallback: try to get Gateway URL from configuration
+                var gatewayUrl = _configuration["Gateway:BaseUrl"] 
+                    ?? _configuration["Gateway__BaseUrl"]
+                    ?? "http://localhost:5000";
+                baseUrl = gatewayUrl;
+            }
+
+            // Build URL through Gateway route: /api/files/{relativePath}
+            var data = images.Select(x => new
+            {
+                x.ImageId,
+                x.ImageName,
+                url = $"{baseUrl}/api/files/{x.RelativePath}",
+                x.ImageSize
+            });
+
+            return Ok(data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting images for submission {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while retrieving images" });
+        }
+    }
+
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(600L * 1024L * 1024L)]
@@ -212,17 +339,35 @@ public class SubmissionsController : ControllerBase
 
     [HttpPost("upload/nested-zip")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(2L * 1024L * 1024L * 1024L)] // 2GB limit
+    [RequestSizeLimit(600L * 1024L * 1024L)] // 600 MB (must match Kestrel MaxRequestBodySize)
     public async Task<IActionResult> UploadNestedZip([FromForm] UploadBatchForm form, CancellationToken ct)
     {
         try
         {
-            // TODO: Implement nested zip upload logic migrated from monolithic API
-            return Ok(new { message = "Nested ZIP upload endpoint - to be implemented" });
+            if (form?.Archive == null)
+            {
+                return BadRequest(new { message = "Archive file is required." });
+            }
+
+            var result = await _nestedZipService.ProcessNestedZipArchiveAsync(form, ct);
+            _logger.LogInformation("Upload completed. CreatedSubmissions count: {Count}, Total: {Total}, Processed: {Processed}", 
+                result.CreatedSubmissions?.Count ?? 0, result.TotalFiles, result.ProcessedFiles);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid request for nested ZIP upload");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Processing failed for nested ZIP upload");
+            return StatusCode(500, new { message = ex.Message });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = ex.Message, detail = ex.ToString() });
+            _logger.LogError(ex, "Unexpected error during nested ZIP upload");
+            return StatusCode(500, new { message = "An unexpected error occurred", detail = ex.Message });
         }
     }
 

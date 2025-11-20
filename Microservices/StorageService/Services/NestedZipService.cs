@@ -39,18 +39,21 @@ public class NestedZipService : INestedZipService
         {
             // Validate session exists and resolve to exam
             var sessionIdGuid = Guid.Parse(form.SessionId!);
-            var examIdGuid = await ResolveSessionToExamAsync(sessionIdGuid, cancellationToken);
-            if (examIdGuid == Guid.Empty)
+            var sessionInfo = await ResolveSessionToExamAsync(sessionIdGuid, cancellationToken);
+            if (sessionInfo.ExamId == Guid.Empty)
             {
-                throw new InvalidOperationException("Exam session not found or exam not active.");
+                throw new InvalidOperationException("Exam session not found.");
             }
 
-            // Validate exam exists and is active
-            var exam = await ValidateExamAsync(examIdGuid, cancellationToken);
-            if (exam == null)
+            // If session is active, we allow upload even if exam is not published
+            // This is more flexible for real-world scenarios
+            if (!sessionInfo.IsActive)
             {
-                throw new InvalidOperationException("Exam not found or not active.");
+                throw new InvalidOperationException("Exam session is not active.");
             }
+
+            var examIdGuid = sessionInfo.ExamId;
+            var examSessionIdGuid = sessionIdGuid; // Store sessionId for ExamSessionId
 
             // Validate archive file
             ValidateArchive(form.Archive);
@@ -119,12 +122,14 @@ public class NestedZipService : INestedZipService
             for (int i = 0; i < docxFiles.Count; i += batchSize)
             {
                 var batch = docxFiles.Skip(i).Take(batchSize).ToList();
-                await ProcessBatchAsync(batch, examIdGuid, existingFiles, batchHashes, result, cancellationToken);
+                await ProcessBatchAsync(batch, examIdGuid, examSessionIdGuid, existingFiles, batchHashes, result, cancellationToken);
                 processedCount += batch.Count;
                 _logger.LogInformation("Processed {Processed}/{Total} files", processedCount, docxFiles.Count);
             }
 
             result.Message = $"Processing completed. Processed: {result.ProcessedFiles}, Duplicates: {result.DuplicateFiles}, Violations: {result.ViolationsCreated}, Images: {result.ImagesExtracted}, Errors: {result.ErrorFiles}";
+            _logger.LogInformation("Processing completed. TotalFiles: {Total}, ProcessedFiles: {Processed}, Duplicates: {Duplicates}, Errors: {Errors}, CreatedSubmissions: {CreatedCount}, SubmissionsCreated: {SubmissionsCreated}", 
+                result.TotalFiles, result.ProcessedFiles, result.DuplicateFiles, result.ErrorFiles, result.CreatedSubmissions?.Count ?? 0, result.SubmissionsCreated);
             return result;
         }
         catch (Exception ex)
@@ -332,11 +337,13 @@ public class NestedZipService : INestedZipService
         }
     }
 
-    private async Task<Guid> ResolveSessionToExamAsync(Guid sessionId, CancellationToken cancellationToken)
+    private async Task<(Guid ExamId, bool IsActive)> ResolveSessionToExamAsync(Guid sessionId, CancellationToken cancellationToken)
     {
         try
         {
-            var coreServiceUrl = _configuration["Services:CoreService"] ?? "http://localhost:5002";
+            var coreServiceUrl = _configuration["Services:CoreService"] 
+                ?? _configuration["Services__CoreService"] 
+                ?? "http://core-service:80";
             _logger.LogInformation("Calling CoreService at {Url} for session {SessionId}", coreServiceUrl, sessionId);
 
             var response = await _httpClient.GetAsync($"{coreServiceUrl}/api/sessions/{sessionId}", cancellationToken);
@@ -344,10 +351,10 @@ public class NestedZipService : INestedZipService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Exam session {SessionId} not found in CoreService. Status: {StatusCode}", sessionId, response.StatusCode);
-                return Guid.Empty;
+                return (Guid.Empty, false);
             }
 
-            // Parse the JSON response to get exam ID
+            // Parse the JSON response to get exam ID and active status
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogInformation("Session response: {Response}", responseContent);
 
@@ -359,16 +366,16 @@ public class NestedZipService : INestedZipService
             if (sessionDto == null)
             {
                 _logger.LogWarning("Failed to parse session response for {SessionId}", sessionId);
-                return Guid.Empty;
+                return (Guid.Empty, false);
             }
 
-            _logger.LogInformation("Resolved session {SessionId} to exam {ExamId}", sessionId, sessionDto.ExamId);
-            return sessionDto.ExamId;
+            _logger.LogInformation("Resolved session {SessionId} to exam {ExamId}, IsActive: {IsActive}", sessionId, sessionDto.ExamId, sessionDto.IsActive);
+            return (sessionDto.ExamId, sessionDto.IsActive);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resolving session {SessionId} to exam: {Message}", sessionId, ex.Message);
-            return Guid.Empty;
+            return (Guid.Empty, false);
         }
     }
 
@@ -390,7 +397,9 @@ public class NestedZipService : INestedZipService
     {
         try
         {
-            var coreServiceUrl = _configuration["Services:CoreService"] ?? "http://localhost:5002";
+            var coreServiceUrl = _configuration["Services:CoreService"] 
+                ?? _configuration["Services__CoreService"] 
+                ?? "http://core-service:80";
             _logger.LogInformation("Validating exam {ExamId} with CoreService at {Url}", examId, coreServiceUrl);
 
             var response = await _httpClient.GetAsync($"{coreServiceUrl}/api/exams/{examId}", cancellationToken);
@@ -416,9 +425,10 @@ public class NestedZipService : INestedZipService
                 return null;
             }
 
-            if (examDto.Status?.ToLower() != "active")
+            // Exam is considered active if Status is "Published" (not "Draft")
+            if (examDto.Status?.ToLower() != "published")
             {
-                _logger.LogWarning("Exam {ExamId} is not active. Status: {Status}", examId, examDto.Status);
+                _logger.LogWarning("Exam {ExamId} is not published. Status: {Status}", examId, examDto.Status);
                 return null;
             }
 
@@ -441,6 +451,7 @@ public class NestedZipService : INestedZipService
     private async Task ProcessBatchAsync(
         List<string> files,
         Guid examId,
+        Guid examSessionId,
         List<string> existingHashes,
         HashSet<string> batchHashes,
         ProcessingResult result,
@@ -467,6 +478,14 @@ public class NestedZipService : INestedZipService
                 _logger.LogInformation("File {FileName}: hash={Hash}, isDuplicate={IsDuplicate}, existingHashes.Count={ExistingCount}, batchHashes.Count={BatchCount}",
                     fileName, hash, isDuplicate, existingHashes.Count, batchHashes.Count);
 
+                // Check for duplicate violation FIRST - before creating any entities
+                if (isDuplicate)
+                {
+                    _logger.LogWarning("Skipping duplicate file: {FileName} with hash {Hash}", fileName, hash);
+                    result.DuplicateFiles++;
+                    continue; // Skip duplicate files - don't create submission or file records
+                }
+
                 // Create submission record
                 var submissionId = Guid.NewGuid();
                 _logger.LogInformation("Creating submission {SubmissionId} for file {FileName} with hash {Hash}", submissionId, fileName, hash);
@@ -476,6 +495,7 @@ public class NestedZipService : INestedZipService
                     Id = submissionId,
                     StudentId = studentId ?? "UNKNOWN",
                     ExamId = examId,
+                    ExamSessionId = examSessionId,
                     Status = "Processing",
                     SubmittedAt = DateTime.UtcNow,
                     TotalFiles = 1,
@@ -492,8 +512,8 @@ public class NestedZipService : INestedZipService
                     FileSizeBytes = new FileInfo(file).Length,
                     FileHash = hash,
                     FileType = "docx",
-                    UploadedAt = DateTime.UtcNow,
-                    Submission = submission
+                    UploadedAt = DateTime.UtcNow
+                    // Don't set navigation property to avoid EF Core tracking issues
                 };
 
                 // Check for naming violation
@@ -509,23 +529,6 @@ public class NestedZipService : INestedZipService
                         DetectedAt = DateTime.UtcNow
                     });
                     result.ViolationsCreated++;
-                }
-
-                // Check for duplicate violation
-                if (isDuplicate)
-                {
-                    violations.Add(new Violation
-                    {
-                        Id = Guid.NewGuid(),
-                        SubmissionId = submission.Id,
-                        Type = "Duplicate",
-                        Severity = "Error",
-                        Description = $"Duplicate content detected: {fileName}",
-                        DetectedAt = DateTime.UtcNow
-                    });
-                    result.ViolationsCreated++;
-                    result.DuplicateFiles++;
-                    continue; // Skip duplicate files
                 }
 
                 // Check for content violations in code files
@@ -557,8 +560,9 @@ public class NestedZipService : INestedZipService
                 // Extract images from DOCX
                 if (string.Equals(Path.GetExtension(file), ".docx", StringComparison.OrdinalIgnoreCase))
                 {
-                    var imagesExtracted = await ExtractImagesFromDocxAsync(file, _storagePath, submission, cancellationToken);
-                    result.ImagesExtracted += imagesExtracted;
+                    var extractedImages = await ExtractImagesFromDocxAsync(file, _storagePath, submission, cancellationToken);
+                    submissionImages.AddRange(extractedImages);
+                    result.ImagesExtracted += extractedImages.Count;
                 }
 
                 submissions.Add(submission);
@@ -584,29 +588,56 @@ public class NestedZipService : INestedZipService
         // Save batch to database with execution strategy (handles retries automatically)
         if (submissions.Any())
         {
+            // Remove duplicates by SubmissionId to prevent PRIMARY KEY violations
+            var uniqueSubmissions = submissions
+                .GroupBy(s => s.Id)
+                .Select(g => g.First())
+                .ToList();
+            
+            var uniqueSubmissionFiles = submissionFiles
+                .Where(sf => uniqueSubmissions.Any(s => s.Id == sf.SubmissionId))
+                .ToList();
+            
+            var uniqueViolations = violations
+                .Where(v => uniqueSubmissions.Any(s => s.Id == v.SubmissionId))
+                .ToList();
+            
+            var uniqueSubmissionImages = submissionImages
+                .Where(img => uniqueSubmissions.Any(s => s.Id == img.SubmissionId))
+                .ToList();
+
+            if (uniqueSubmissions.Count != submissions.Count)
+            {
+                _logger.LogWarning("Removed {DuplicateCount} duplicate submissions from batch", submissions.Count - uniqueSubmissions.Count);
+            }
+
             var strategy = _context.Database.CreateExecutionStrategy();
             await strategy.ExecuteAsync(async () =>
             {
                 using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    await _context.Submissions.AddRangeAsync(submissions, cancellationToken);
-                    await _context.SubmissionFiles.AddRangeAsync(submissionFiles, cancellationToken);
+                    // First, save submissions to get them persisted
+                    await _context.Submissions.AddRangeAsync(uniqueSubmissions, cancellationToken);
+                    await _context.SaveChangesAsync(cancellationToken);
+                    
+                    // Then save related entities that reference submissions
+                    await _context.SubmissionFiles.AddRangeAsync(uniqueSubmissionFiles, cancellationToken);
 
-                    if (violations.Any())
+                    if (uniqueViolations.Any())
                     {
-                        await _context.Violations.AddRangeAsync(violations, cancellationToken);
+                        await _context.Violations.AddRangeAsync(uniqueViolations, cancellationToken);
                     }
 
-                    if (submissionImages.Any())
+                    if (uniqueSubmissionImages.Any())
                     {
-                        await _context.SubmissionImages.AddRangeAsync(submissionImages, cancellationToken);
+                        await _context.SubmissionImages.AddRangeAsync(uniqueSubmissionImages, cancellationToken);
                     }
 
                     await _context.SaveChangesAsync(cancellationToken);
 
                     // Update submission status to Pending
-                    foreach (var submission in submissions)
+                    foreach (var submission in uniqueSubmissions)
                     {
                         submission.Status = "Pending";
                         submission.ProcessedAt = DateTime.UtcNow;
@@ -614,15 +645,30 @@ public class NestedZipService : INestedZipService
                     await _context.SaveChangesAsync(cancellationToken);
 
                     await transaction.CommitAsync(cancellationToken);
-                    _logger.LogInformation("Successfully saved batch of {Count} submissions", submissions.Count);
+                    _logger.LogInformation("Successfully saved batch of {Count} submissions", uniqueSubmissions.Count);
+                    
+                    // Update SubmissionsCreated count
+                    result.SubmissionsCreated += uniqueSubmissions.Count;
+                    
+                    // Remove CreatedSubmissions entries that weren't saved (duplicates removed)
+                    var savedSubmissionIds = uniqueSubmissions.Select(s => s.Id).ToHashSet();
+                    result.CreatedSubmissions.RemoveAll(cs => !savedSubmissionIds.Contains(cs.SubmissionId));
                 }
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    _logger.LogError(ex, "Failed to save batch of {Count} submissions", submissions.Count);
+                    _logger.LogError(ex, "Failed to save batch of {Count} submissions", uniqueSubmissions.Count);
+                    
+                    // Remove CreatedSubmissions entries that failed to save
+                    var failedSubmissionIds = submissions.Select(s => s.Id).ToHashSet();
+                    result.CreatedSubmissions.RemoveAll(cs => failedSubmissionIds.Contains(cs.SubmissionId));
                     throw;
                 }
             });
+        }
+        else
+        {
+            _logger.LogInformation("No submissions to save in this batch (all duplicates or errors)");
         }
     }
 
@@ -646,7 +692,7 @@ public class NestedZipService : INestedZipService
         }
     }
 
-    private async Task<int> ExtractImagesFromDocxAsync(string docxPath, string storageRoot, Submission submission, CancellationToken cancellationToken)
+    private async Task<List<SubmissionImage>> ExtractImagesFromDocxAsync(string docxPath, string storageRoot, Submission submission, CancellationToken cancellationToken)
     {
         try
         {
@@ -655,7 +701,7 @@ public class NestedZipService : INestedZipService
                 .Where(e => e.FullName.StartsWith("word/media/", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(e.Name))
                 .ToList();
 
-            if (mediaEntries.Count == 0) return 0;
+            if (mediaEntries.Count == 0) return new List<SubmissionImage>();
 
             var imagesDir = EnsureDirectory(Path.Combine(storageRoot, "jobs", submission.Id.ToString(), "images"));
             var images = new List<SubmissionImage>();
@@ -672,23 +718,17 @@ public class NestedZipService : INestedZipService
                     ImageName = entry.Name,
                     ImagePath = MakeRelativePath(storageRoot, outPath),
                     ImageSizeBytes = new FileInfo(outPath).Length,
-                    ExtractedAt = DateTime.UtcNow,
-                    Submission = submission
+                    ExtractedAt = DateTime.UtcNow
+                    // Don't set navigation property to avoid EF Core tracking issues
                 });
             }
 
-            if (images.Any())
-            {
-                await _context.SubmissionImages.AddRangeAsync(images, cancellationToken);
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-
-            return images.Count;
+            return images;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to extract images from DOCX: {File}", submission.Id);
-            return 0;
+            _logger.LogWarning(ex, "Failed to extract images from DOCX: {SubmissionId}", submission.Id);
+            return new List<SubmissionImage>();
         }
     }
 
