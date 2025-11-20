@@ -113,6 +113,8 @@ public class NestedZipService : INestedZipService
                 .Where(f => f.Submission.ExamId == examIdGuid && f.FileHash != null)
                 .Select(f => f.FileHash!)
                 .ToListAsync(cancellationToken);
+            // Tracks hashes within this processing job to detect potential duplicates.
+            // NOTE: We no longer skip duplicates entirely; we just record a violation.
             var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // Step 5: Process files in batches for performance
@@ -122,7 +124,15 @@ public class NestedZipService : INestedZipService
             for (int i = 0; i < docxFiles.Count; i += batchSize)
             {
                 var batch = docxFiles.Skip(i).Take(batchSize).ToList();
-                await ProcessBatchAsync(batch, examIdGuid, examSessionIdGuid, existingFiles, batchHashes, result, cancellationToken);
+                var savedHashes = await ProcessBatchAsync(batch, examIdGuid, examSessionIdGuid, existingFiles, batchHashes, result, cancellationToken);
+                
+                // Update existingFiles with newly saved hashes to avoid duplicates in next batches
+                if (savedHashes != null && savedHashes.Any())
+                {
+                    existingFiles.AddRange(savedHashes);
+                    _logger.LogInformation("Updated existingFiles with {Count} new hashes from saved batch", savedHashes.Count);
+                }
+                
                 processedCount += batch.Count;
                 _logger.LogInformation("Processed {Processed}/{Total} files", processedCount, docxFiles.Count);
             }
@@ -448,7 +458,7 @@ public class NestedZipService : INestedZipService
         public string Status { get; set; } = string.Empty;
     }
 
-    private async Task ProcessBatchAsync(
+    private async Task<List<string>?> ProcessBatchAsync(
         List<string> files,
         Guid examId,
         Guid examSessionId,
@@ -478,12 +488,14 @@ public class NestedZipService : INestedZipService
                 _logger.LogInformation("File {FileName}: hash={Hash}, isDuplicate={IsDuplicate}, existingHashes.Count={ExistingCount}, batchHashes.Count={BatchCount}",
                     fileName, hash, isDuplicate, existingHashes.Count, batchHashes.Count);
 
-                // Check for duplicate violation FIRST - before creating any entities
+                // If duplicate, record a violation but STILL create a submission so that every student appears.
                 if (isDuplicate)
                 {
-                    _logger.LogWarning("Skipping duplicate file: {FileName} with hash {Hash}", fileName, hash);
+                    _logger.LogWarning("Detected potential duplicate file: {FileName} with hash {Hash}", fileName, hash);
                     result.DuplicateFiles++;
-                    continue; // Skip duplicate files - don't create submission or file records
+
+                    // We'll attach a Duplicate violation later after we have the submission Id.
+                    // For now we just log; the actual Violation entity is created once submission exists.
                 }
 
                 // Create submission record
@@ -563,6 +575,21 @@ public class NestedZipService : INestedZipService
                     var extractedImages = await ExtractImagesFromDocxAsync(file, _storagePath, submission, cancellationToken);
                     submissionImages.AddRange(extractedImages);
                     result.ImagesExtracted += extractedImages.Count;
+                }
+
+                // If this file was marked as duplicate, register a violation against this submission
+                if (isDuplicate)
+                {
+                    violations.Add(new Violation
+                    {
+                        Id = Guid.NewGuid(),
+                        SubmissionId = submission.Id,
+                        Type = "Duplicate",
+                        Severity = "Warning",
+                        Description = $"Possible duplicate submission detected for file: {fileName}",
+                        DetectedAt = DateTime.UtcNow
+                    });
+                    result.ViolationsCreated++;
                 }
 
                 submissions.Add(submission);
@@ -649,26 +676,31 @@ public class NestedZipService : INestedZipService
                     
                     // Update SubmissionsCreated count
                     result.SubmissionsCreated += uniqueSubmissions.Count;
-                    
-                    // Remove CreatedSubmissions entries that weren't saved (duplicates removed)
-                    var savedSubmissionIds = uniqueSubmissions.Select(s => s.Id).ToHashSet();
-                    result.CreatedSubmissions.RemoveAll(cs => !savedSubmissionIds.Contains(cs.SubmissionId));
+
+                    // Return list of hashes from successfully saved files
+                    var savedHashes = uniqueSubmissionFiles
+                        .Where(sf => !string.IsNullOrEmpty(sf.FileHash))
+                        .Select(sf => sf.FileHash!)
+                        .ToList();
+                    return savedHashes;
                 }
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     _logger.LogError(ex, "Failed to save batch of {Count} submissions", uniqueSubmissions.Count);
                     
-                    // Remove CreatedSubmissions entries that failed to save
-                    var failedSubmissionIds = submissions.Select(s => s.Id).ToHashSet();
-                    result.CreatedSubmissions.RemoveAll(cs => failedSubmissionIds.Contains(cs.SubmissionId));
-                    throw;
+                    // Return null to indicate no hashes were saved
+                    return null;
                 }
             });
+            
+            // This should never be reached, but compiler needs it
+            return null;
         }
         else
         {
             _logger.LogInformation("No submissions to save in this batch (all duplicates or errors)");
+            return null; // No hashes to return
         }
     }
 
