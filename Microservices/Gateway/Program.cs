@@ -10,6 +10,17 @@ builder.Services.AddReverseProxy()
 // Add JWT Authentication from Shared library
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// Configure request size limits for large file uploads
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = 600L * 1024L * 1024L; // 600 MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 600L * 1024L * 1024L; // 600 MB
+});
+
 // Add CORS
 builder.Services.AddCors(options =>
 {

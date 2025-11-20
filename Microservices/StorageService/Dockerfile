@@ -1,6 +1,8 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER root
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y curl p7zip-full && \
+    rm -rf /var/lib/apt/lists/*
 USER app
 WORKDIR /app
 EXPOSE 80
@@ -29,5 +31,13 @@ RUN dotnet publish "StorageService.csproj" -c Release -o /app/publish /p:UseAppH
 
 FROM base AS final
 WORKDIR /app
+
+# Create storage directories with proper permissions
+USER root
+RUN mkdir -p /app/storage/uploads /app/storage/jobs && \
+    chown -R app:app /app/storage && \
+    chmod -R 755 /app/storage
+
+USER app
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "StorageService.dll"]

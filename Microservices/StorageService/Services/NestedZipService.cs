@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using StorageService.Data;
 using StorageService.Entities;
 using StorageService.Models;
@@ -36,8 +37,15 @@ public class NestedZipService : INestedZipService
     {
         try
         {
+            // Validate session exists and resolve to exam
+            var sessionIdGuid = Guid.Parse(form.SessionId!);
+            var examIdGuid = await ResolveSessionToExamAsync(sessionIdGuid, cancellationToken);
+            if (examIdGuid == Guid.Empty)
+            {
+                throw new InvalidOperationException("Exam session not found or exam not active.");
+            }
+
             // Validate exam exists and is active
-            var examIdGuid = Guid.Parse(form.ExamId!);
             var exam = await ValidateExamAsync(examIdGuid, cancellationToken);
             if (exam == null)
             {
@@ -105,7 +113,7 @@ public class NestedZipService : INestedZipService
             var batchHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // Step 5: Process files in batches for performance
-            const int batchSize = 50;
+            const int batchSize = 20; // Balanced batch size for performance vs parameter limits
             var processedCount = 0;
 
             for (int i = 0; i < docxFiles.Count; i += batchSize)
@@ -121,8 +129,8 @@ public class NestedZipService : INestedZipService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing nested ZIP archive. File: {FileName}, ExamId: {ExamId}",
-                form.Archive.FileName, form.ExamId);
+            _logger.LogError(ex, "Error processing nested ZIP archive. File: {FileName}, SessionId: {SessionId}",
+                form.Archive.FileName, form.SessionId);
             throw new InvalidOperationException($"Failed to process nested ZIP archive: {ex.Message}", ex);
         }
     }
@@ -146,45 +154,68 @@ public class NestedZipService : INestedZipService
         }
         else if (ext == ".rar")
         {
+            // Try 7-Zip first
             var sevenZip = _configuration["Storage:SevenZipPath"];
-            if (string.IsNullOrEmpty(sevenZip) || !File.Exists(sevenZip))
+            if (!string.IsNullOrEmpty(sevenZip) && File.Exists(sevenZip))
             {
-                _logger.LogError("7-Zip executable not found at: {SevenZipPath}", sevenZip);
-                throw new InvalidOperationException($"7-Zip executable not found. Please configure Storage:SevenZipPath in appsettings.json");
+                try
+                {
+                    _logger.LogInformation("Attempting RAR extraction using 7-Zip: {ArchivePath} to {ExtractDir}", archivePath, extractDir);
+
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = sevenZip,
+                        Arguments = $"x -y -bb0 -o\"{extractDir}\" \"{archivePath}\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    using var proc = System.Diagnostics.Process.Start(psi);
+                    if (proc == null)
+                    {
+                        _logger.LogError("Failed to start 7-Zip process for: {ArchivePath}", archivePath);
+                        throw new InvalidOperationException("Failed to start 7-Zip process.");
+                    }
+
+                    var output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
+                    var error = await proc.StandardError.ReadToEndAsync(cancellationToken);
+                    await proc.WaitForExitAsync(cancellationToken);
+
+                    if (proc.ExitCode == 0 || proc.ExitCode == 1)
+                    {
+                        // Exit code 0 = success, 1 = warning (some files may have failed but extraction mostly succeeded)
+                        _logger.LogInformation("Successfully extracted RAR file using 7-Zip (ExitCode: {ExitCode}): {ArchivePath}", proc.ExitCode, archivePath);
+                        if (proc.ExitCode == 1)
+                        {
+                            _logger.LogWarning("Some files may have failed extraction: {Error}", error);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("7-Zip extraction failed. ExitCode: {ExitCode}, Error: {Error}", proc.ExitCode, error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "7-Zip extraction failed, trying unrar...");
+                }
             }
 
-            _logger.LogInformation("Extracting RAR using 7-Zip: {ArchivePath} to {ExtractDir}", archivePath, extractDir);
-
-            var psi = new System.Diagnostics.ProcessStartInfo
+            // 7-Zip failed, but with tolerant error handling, we may still have extracted most files
+            // Check if any files were actually extracted
+            if (Directory.Exists(extractDir) && Directory.GetFiles(extractDir, "*.*", SearchOption.AllDirectories).Any())
             {
-                FileName = sevenZip,
-                Arguments = $"x -y -o\"{extractDir}\" \"{archivePath}\"",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc == null)
-            {
-                _logger.LogError("Failed to start 7-Zip process for: {ArchivePath}", archivePath);
-                throw new InvalidOperationException("Failed to start 7-Zip process.");
+                _logger.LogWarning("7-Zip had warnings/errors but some files were extracted. Continuing with processing.");
+                return;
             }
 
-            var output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
-            var error = await proc.StandardError.ReadToEndAsync(cancellationToken);
-            await proc.WaitForExitAsync(cancellationToken);
-
-            if (proc.ExitCode != 0)
-            {
-                _logger.LogError("7-Zip extraction failed. ExitCode: {ExitCode}, Error: {Error}, Output: {Output}",
-                    proc.ExitCode, error, output);
-                throw new InvalidOperationException(
-                    $"Failed to extract RAR file. The file may be corrupted, password protected, or contain invalid entries.");
-            }
-
-            _logger.LogInformation("Successfully extracted RAR file: {ArchivePath}", archivePath);
+            // If no files were extracted at all, then it's a real failure
+            _logger.LogError("7-Zip extraction failed completely. No files were extracted from: {ArchivePath}", archivePath);
+            throw new InvalidOperationException(
+                $"Failed to extract RAR file. 7-Zip reported errors and no files were successfully extracted. The file may be corrupted, password protected, or use unsupported compression methods.");
         }
         else
         {
@@ -301,28 +332,110 @@ public class NestedZipService : INestedZipService
         }
     }
 
+    private async Task<Guid> ResolveSessionToExamAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var coreServiceUrl = _configuration["Services:CoreService"] ?? "http://localhost:5002";
+            _logger.LogInformation("Calling CoreService at {Url} for session {SessionId}", coreServiceUrl, sessionId);
+
+            var response = await _httpClient.GetAsync($"{coreServiceUrl}/api/sessions/{sessionId}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Exam session {SessionId} not found in CoreService. Status: {StatusCode}", sessionId, response.StatusCode);
+                return Guid.Empty;
+            }
+
+            // Parse the JSON response to get exam ID
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("Session response: {Response}", responseContent);
+
+            var sessionDto = JsonSerializer.Deserialize<ExamSessionResponse>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (sessionDto == null)
+            {
+                _logger.LogWarning("Failed to parse session response for {SessionId}", sessionId);
+                return Guid.Empty;
+            }
+
+            _logger.LogInformation("Resolved session {SessionId} to exam {ExamId}", sessionId, sessionDto.ExamId);
+            return sessionDto.ExamId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resolving session {SessionId} to exam: {Message}", sessionId, ex.Message);
+            return Guid.Empty;
+        }
+    }
+
+    private class ExamSessionResponse
+    {
+        public Guid Id { get; set; }
+        public Guid ExamId { get; set; }
+        public string ExamTitle { get; set; } = string.Empty;
+        public string SessionName { get; set; } = string.Empty;
+        public DateTime ScheduledDate { get; set; }
+        public string? Location { get; set; }
+        public int MaxStudents { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public int ExaminerAssignmentsCount { get; set; }
+    }
+
     private async Task<dynamic?> ValidateExamAsync(Guid examId, CancellationToken cancellationToken)
     {
         try
         {
-            var coreServiceUrl = _configuration["Services:CoreService"];
+            var coreServiceUrl = _configuration["Services:CoreService"] ?? "http://localhost:5002";
+            _logger.LogInformation("Validating exam {ExamId} with CoreService at {Url}", examId, coreServiceUrl);
+
             var response = await _httpClient.GetAsync($"{coreServiceUrl}/api/exams/{examId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Exam {ExamId} not found in CoreService", examId);
+                _logger.LogWarning("Exam {ExamId} not found in CoreService. Status: {StatusCode}", examId, response.StatusCode);
                 return null;
             }
 
-            // For now, assume exam is valid if it exists and check status
-            // In a full implementation, we'd parse the response to check if it's active
+            // Parse the response to check if exam is active
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("Exam response: {Response}", responseContent);
+
+            var examDto = JsonSerializer.Deserialize<ExamResponse>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (examDto == null)
+            {
+                _logger.LogWarning("Failed to parse exam response for {ExamId}", examId);
+                return null;
+            }
+
+            if (examDto.Status?.ToLower() != "active")
+            {
+                _logger.LogWarning("Exam {ExamId} is not active. Status: {Status}", examId, examDto.Status);
+                return null;
+            }
+
+            _logger.LogInformation("Exam {ExamId} validated successfully", examId);
             return new { Id = examId, IsActive = true };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating exam {ExamId}", examId);
+            _logger.LogError(ex, "Error validating exam {ExamId}: {Message}", examId, ex.Message);
             return null;
         }
+    }
+
+    private class ExamResponse
+    {
+        public Guid Id { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 
     private async Task ProcessBatchAsync(
@@ -351,10 +464,16 @@ public class NestedZipService : INestedZipService
                 var hash = await ComputeSha256Async(file, cancellationToken);
                 var isDuplicate = (hash != null && (existingHashes.Contains(hash) || !batchHashes.Add(hash)));
 
+                _logger.LogInformation("File {FileName}: hash={Hash}, isDuplicate={IsDuplicate}, existingHashes.Count={ExistingCount}, batchHashes.Count={BatchCount}",
+                    fileName, hash, isDuplicate, existingHashes.Count, batchHashes.Count);
+
                 // Create submission record
+                var submissionId = Guid.NewGuid();
+                _logger.LogInformation("Creating submission {SubmissionId} for file {FileName} with hash {Hash}", submissionId, fileName, hash);
+
                 var submission = new Submission
                 {
-                    Id = Guid.NewGuid(),
+                    Id = submissionId,
                     StudentId = studentId ?? "UNKNOWN",
                     ExamId = examId,
                     Status = "Processing",
@@ -462,31 +581,48 @@ public class NestedZipService : INestedZipService
             }
         }
 
-        // Save batch to database
+        // Save batch to database with execution strategy (handles retries automatically)
         if (submissions.Any())
         {
-            await _context.Submissions.AddRangeAsync(submissions, cancellationToken);
-            await _context.SubmissionFiles.AddRangeAsync(submissionFiles, cancellationToken);
-
-            if (violations.Any())
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                await _context.Violations.AddRangeAsync(violations, cancellationToken);
-            }
+                using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    await _context.Submissions.AddRangeAsync(submissions, cancellationToken);
+                    await _context.SubmissionFiles.AddRangeAsync(submissionFiles, cancellationToken);
 
-            if (submissionImages.Any())
-            {
-                await _context.SubmissionImages.AddRangeAsync(submissionImages, cancellationToken);
-            }
+                    if (violations.Any())
+                    {
+                        await _context.Violations.AddRangeAsync(violations, cancellationToken);
+                    }
 
-            await _context.SaveChangesAsync(cancellationToken);
+                    if (submissionImages.Any())
+                    {
+                        await _context.SubmissionImages.AddRangeAsync(submissionImages, cancellationToken);
+                    }
 
-            // Update submission status to Pending
-            foreach (var submission in submissions)
-            {
-                submission.Status = "Pending";
-                submission.ProcessedAt = DateTime.UtcNow;
-            }
-            await _context.SaveChangesAsync(cancellationToken);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    // Update submission status to Pending
+                    foreach (var submission in submissions)
+                    {
+                        submission.Status = "Pending";
+                        submission.ProcessedAt = DateTime.UtcNow;
+                    }
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    await transaction.CommitAsync(cancellationToken);
+                    _logger.LogInformation("Successfully saved batch of {Count} submissions", submissions.Count);
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    _logger.LogError(ex, "Failed to save batch of {Count} submissions", submissions.Count);
+                    throw;
+                }
+            });
         }
     }
 
