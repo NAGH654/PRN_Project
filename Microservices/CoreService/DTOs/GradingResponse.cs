@@ -26,8 +26,10 @@ public class RubricScoreDetail
 
 public enum GradingStatus
 {
+    NotGraded,
     FirstGrading,
     SecondGrading,
     AwaitingModeratorReview,
-    Finalized
+    Finalized,
+    MarkedZero
 }

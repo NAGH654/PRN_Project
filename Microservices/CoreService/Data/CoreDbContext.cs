@@ -16,6 +16,7 @@ public class CoreDbContext : DbContext
     public DbSet<ExamSession> ExamSessions { get; set; }
     public DbSet<ExaminerAssignment> ExaminerAssignments { get; set; }
     public DbSet<Grade> Grades { get; set; }
+    public DbSet<RubricScore> RubricScores { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +60,12 @@ public class CoreDbContext : DbContext
             .HasForeignKey(g => g.ExamId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<RubricScore>()
+            .HasOne(rs => rs.RubricItem)
+            .WithMany()
+            .HasForeignKey(rs => rs.RubricItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Indexes for performance
         modelBuilder.Entity<Subject>()
             .HasIndex(s => s.Code)
@@ -70,6 +77,9 @@ public class CoreDbContext : DbContext
 
         modelBuilder.Entity<Grade>()
             .HasIndex(g => new { g.ExamId, g.StudentId });
+
+        modelBuilder.Entity<RubricScore>()
+            .HasIndex(rs => new { rs.SubmissionId, rs.RubricItemId, rs.GradedBy });
 
         modelBuilder.Entity<AuditLog>()
             .HasIndex(a => new { a.EntityType, a.EntityId });

@@ -22,6 +22,8 @@ public class RubricScore
 
     public DateTime GradedAt { get; set; } = DateTime.UtcNow;
 
+    public bool IsFinal { get; set; } = false; // Whether this grade is finalized by moderator
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }

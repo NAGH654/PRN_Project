@@ -257,6 +257,46 @@ namespace CoreService.Migrations
                     b.ToTable("RubricItem", "Core");
                 });
 
+            modelBuilder.Entity("CoreService.Entities.RubricScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("GradedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("GradedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Points")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("RubricItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RubricItemId");
+
+                    b.HasIndex("SubmissionId", "RubricItemId", "GradedBy");
+
+                    b.ToTable("RubricScore", "Core");
+                });
+
             modelBuilder.Entity("CoreService.Entities.Semester", b =>
                 {
                     b.Property<Guid>("Id")
@@ -391,6 +431,17 @@ namespace CoreService.Migrations
                         .IsRequired();
 
                     b.Navigation("Exam");
+                });
+
+            modelBuilder.Entity("CoreService.Entities.RubricScore", b =>
+                {
+                    b.HasOne("CoreService.Entities.RubricItem", "RubricItem")
+                        .WithMany()
+                        .HasForeignKey("RubricItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RubricItem");
                 });
 
             modelBuilder.Entity("CoreService.Entities.Exam", b =>
